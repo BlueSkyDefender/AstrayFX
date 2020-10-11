@@ -82,7 +82,7 @@
 // 3 = Medium
 // 4 = High
 // Default is off.
-#define M_Quality 0 //Manual Quality Shader Defaults to 2 when set to off.
+#define M_Quality 0 //Manualy set shader Quality. Defaults to 2 when set to off.
 
 //Zero is Fast, a ''Optimized'' Bilateral Filtering approach wink wink and One is a Acuurate. Acuurate is the correct way of doing Bilateral filtering.
 #define B_Accuracy 0 //Bilateral Accuracy
@@ -289,7 +289,7 @@ sampler PBBSS
 	{
 		Texture = PastBBSSTex;
 	};
-	
+
 texture DownSTex {Width = 256; Height = 256; Format = R8;  MipLevels = 9;};
 
 sampler DSM
@@ -370,7 +370,7 @@ float MotionSharpen(float2 texcoord)
 		BlurMotion += tex2D(DSM,texcoord + float2(PS.x,0)).x;
 		BlurMotion += tex2D(DSM,texcoord + float2(-PS.x,0)).x;
 		BlurMotion += tex2D(DSM,texcoord + float2(0,-PS.y)).x;
-		return (BlurMotion * 0.2) * 12.5; 
+		return (BlurMotion * 0.2) * 12.5;
 	}
 	else
 		return tex2Dlod(DSM,float4(texcoord,0,11)).x * lerp(0.0,25.0,GMD);
@@ -382,7 +382,7 @@ float MotionSharpen(float2 texcoord)
 float4 CAS(float2 texcoord)
 {
     float Up, Left, Center, Right, Down, mnRGB, mxRGB;
-    
+
 	// fetch a Cross neighborhood around the pixel 'C',
 	//         Up
 	//
@@ -390,16 +390,16 @@ float4 CAS(float2 texcoord)
 	//
 	//        Down
 	if(!CA_Removal)
-	{ 
+	{
 	    Up = LI(BB(texcoord, float2( 0,-pix.y)));
 	    Left = LI(BB(texcoord, float2(-pix.x, 0)));
 	    Center = LI(BB(texcoord, 0));
 	    Right = LI(BB(texcoord, float2( pix.x, 0)));
 		Down = LI(BB(texcoord, float2( 0, pix.y)));
-	
+
 	    mnRGB = Min3( Min3(Left, Center, Right), Up, Down);
 	    mxRGB = Max3( Max3(Left, Center, Right), Up, Down);
-	}    
+	}
     // Smooth minimum distance to signal limit divided by smooth max.
     float rcpMRGB = rcp(mxRGB), RGB_D = saturate(min(mnRGB, 1.0 - mxRGB) * rcpMRGB);
 
@@ -419,18 +419,18 @@ float4 CAS(float2 texcoord)
 	{
 		kernal[kSize+o] = kernal[kSize-o] = normpdf(o, SIGMA);
 	}
-	#endif	
+	#endif
 	[loop]
 	for (int i=-kSize; i <= kSize; ++i)
 	{
 			for (int j=-kSize; j <= kSize; ++j)
-			{  
+			{
 				cc = BB(texcoord.xy, float2(i,j) * RPC_WS * rcp(kSize) );
 				#if B_Accuracy
 					factor = normpdf3(cc-c, BSIGMA) * bZ * kernal[kSize+j] * kernal[kSize+i];
 				#else
 					factor = normpdf3(cc-c, BSIGMA);
-				#endif	
+				#endif
 				Z += factor;
 				final_colour += factor * cc;
 			}
@@ -457,7 +457,7 @@ float4 Sharpen_Out(float2 texcoord)
 
 	if(GMD > 0 || Local_Motion)
 		Sharp = Sharpness * lerp( 1,MDSM,saturate(MD));
-		
+
     float3 Done = tex2D(BackBuffer,texcoord).rgb;
     if(CA_Removal || Debug_View || Debug_View == 4 || F_DeNoise)
     {   //Noise reduction for pure Bilateral Sharp WIP
@@ -465,7 +465,7 @@ float4 Sharpen_Out(float2 texcoord)
     	Noise = min( Min3(Done.r,Done.g,Done.b) * 2 - 1,2-Max3(Done.r,Done.g,Done.b));
     	Done = lerp(CAS(texcoord).rgb,tex2D(BackBuffer,texcoord).rgb,saturate(Noise));
     }
-    
+
     if(Debug_View || Debug_View == 4)
 		return float4((Done - CAS(texcoord).rgb)*(Sharp*3.1),saturate(Noise)); //Sharpen Debug and Noise
 	else
@@ -491,7 +491,7 @@ float3 ShaderOut(float2 texcoord : TEXCOORD0)
 		Out.rgb = lerp(1.0,CAS(float2(texcoord.x,texcoord.y)).www,1-DB);
 	else if (Debug_View == 4)
 		Out.rgb = Sharpen_Out(texcoord).w;
-		
+
 	#if Motion_Sharpen
 	if (Debug_View >= 1)
 	{
