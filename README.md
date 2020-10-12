@@ -1,7 +1,7 @@
 # AstrayFX
 
 ### **Welcome to AstrayFX Shader Archive**
-### Highlighted Shaders ReShade 
+### Highlighted Shaders for ReShade 
 This repository is apart of the [Depth3D Family](https://github.com/BlueSkyDefender/Depth3D) to maintain content that falls outside of Stereo 3D....
 
 **Smart Sharp**<br />
