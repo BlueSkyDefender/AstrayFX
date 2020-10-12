@@ -2,8 +2,7 @@
 
 ### **Welcome to AstrayFX Shader Archive**
 ### Highlighted Shaders ReShade 
-**SuperDepth3D & SuperDepth3D VR**<br />
-This repository is apart of the Depth3D Family to maintain content that falls outside of Stereo 3D.
+This repository is apart of the [Depth3D Family](https://github.com/BlueSkyDefender/Depth3D) to maintain content that falls outside of Stereo 3D....
 
 **Smart Sharp**<br />
 A Smart Bilateral Sharpening filer that uses depth to gradually phase out it's effect to keep very distant objects from becoming sharp.
