@@ -1,7 +1,7 @@
 ### **Welcome to AstrayFX Shader Archive**
-### Highlighted Shaders for ReShade 
 This repository is apart of the [Depth3D Family](https://github.com/BlueSkyDefender/Depth3D) to maintain content that falls outside of Stereo 3D....
 
+### Highlighted Shaders for ReShade 
 **Smart Sharp**<br />
 A Smart Bilateral Sharpening filer that uses depth to gradually phase out it's effect to keep very distant objects from becoming sharp.
 Because who wants razor-sharp clouds? Birds don't, so why should you.
@@ -53,12 +53,15 @@ https://github.com/BlueSkyDefender/Depth3D/blob/master/Shaders/Game_Help.txt<br 
 
 ### Contact & Donation Links
 
-**Want to leave me a message at the forums:** BlueSkyKnight<br />
+**Want to leave me a message at the forums?:** BlueSkyKnight<br />
 https://reshade.me/forum/shader-presentation/2128-sidebyside-3d-depth-map-based-stereoscopic-shader<br />
-**Want to leave me a message:** BlueSkyDefender<br />
+
+**Want to leave me a message?:** BlueSkyDefender<br />
 Also my steam page https://steamcommunity.com/id/BlueSkyDefender<br />
-**Want to leave me a message or talk to me:** BlueSkyDefender<br />
+
+**Want to leave me a message or talk to me?:** BlueSkyDefender<br />
 Discord Server https://discord.gg/W2f7YhX<br />
-**Want to dontate to me:**
+
+**Want to dontate?:**
 If you enjoyed these shaders and like to donate you can do so at https://paypal.me/BlueSkyDefender
 This or https://www.buymeacoffee.com/BlueSkyDefender
