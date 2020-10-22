@@ -7,13 +7,13 @@ A Smart Bilateral Sharpening filer that uses depth to gradually phase out it's e
 Because who wants razor-sharp clouds? Birds don't, so why should you.
 
 **Depth Cues**<br />
-Depth Based Unsharp Mask intentional haloing. This will work with or without depth. On video, video games, and with still images. *UPDATE PENDING*
-This will enhance Depth Effects that are already apart of the scene.
+Depth Based Unsharp Mask intentional haloing. This will work with or without depth. On video, video games, and with still images.
+This will enhance Depth Effects that are already apart of the scene. *UPDATE PENDING*
 
 **Temporal AA**<br />
 TAA is a Epic Games implementation of Temporal AA that seems the only real way of doing this in reshade with out motion vectors. *UPDATE PENDING*
 
-**eMotionBLur**<br /> *WIP* 
+**eMotionBLur**<br />
 Fake motion vectors Motion Blur. *UPDATE PENDING*
 
 **Trails**<br />
