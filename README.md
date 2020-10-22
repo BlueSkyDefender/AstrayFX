@@ -7,11 +7,14 @@ A Smart Bilateral Sharpening filer that uses depth to gradually phase out it's e
 Because who wants razor-sharp clouds? Birds don't, so why should you.
 
 **Depth Cues**<br />
-Depth Based Unsharp Mask intentional haloing. This will work with or without depth. On video, video games, and with still images.
+Depth Based Unsharp Mask intentional haloing. This will work with or without depth. On video, video games, and with still images. *UPDATE PENDING*
 This will enhance Depth Effects that are already apart of the scene.
 
 **Temporal AA**<br />
-TAA is a Epic Games implementation of Temporal AA that seems the only real way of doing this in reshade with out motion vectors.
+TAA is a Epic Games implementation of Temporal AA that seems the only real way of doing this in reshade with out motion vectors. *UPDATE PENDING*
+
+**eMotionBLur**<br /> *WIP* 
+Fake motion vectors Motion Blur. *UPDATE PENDING*
 
 **Trails**<br />
 This is an echoing based shader to add a trail to your image as you increase the image persistence. Mainly used for light painting.
@@ -26,7 +29,7 @@ A modded port of Normal Filter Anti Aliasing. With an interesting use case. Use 
 A Basic High Bloom mid Perf HDR shader that allows for automatic functions to help setting it up in-game.
 
 **RadiantGI**<br />
-Info Pending....
+RadiantGI is an indirect lighting algorithm based on the disk-to-disk radiance transfer. It's simply Radiant................
 
 **GloomAO**<br />
 Info Pending....
@@ -54,13 +57,10 @@ https://github.com/BlueSkyDefender/Depth3D/blob/master/Shaders/Game_Help.txt<br 
 ### Contact & Donation Links
 
 **Want to leave me a message at the forums?:** BlueSkyKnight<br />
-https://reshade.me/forum/shader-presentation/2128-sidebyside-3d-depth-map-based-stereoscopic-shader<br />
-
-**Want to leave me a message?:** BlueSkyDefender<br />
-Also my steam page https://steamcommunity.com/id/BlueSkyDefender<br />
+[ReShade](https://reshade.me/forum/shader-presentation/2128-sidebyside-3d-depth-map-based-stereoscopic-shader)<br />
 
 **Want to leave me a message or talk to me?:** BlueSkyDefender<br />
-Discord Server https://discord.gg/W2f7YhX<br />
+Discord Server [Discord](https://discord.gg/W2f7YhX)<br />
 
 **Want to dontate?:**
-If you enjoyed these shaders and like to donate you can do so at https://paypal.me/BlueSkyDefender or https://www.buymeacoffee.com/BlueSkyDefender
+If you enjoyed these shaders and like to donate you can do so at [PayPal](https://paypal.me/BlueSkyDefender) or [BuyMeACoffee](https://www.buymeacoffee.com/BlueSkyDefender)
