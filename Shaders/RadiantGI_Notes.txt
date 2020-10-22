@@ -1,0 +1,21 @@
+
+I do hope I made this shader easy as I can to use. It should be a solo file with no external folders or textures. 
+Everything thats is needed for GI alone is in this shader file called RadiantGI.fx
+
+PBGI_Alpha should always be on top of PBGI_Beta at all times.
+
+PBGI_Alpha is the GI Ray Generator.
+                                      You can slide any shader between them ;).
+PBGI_Beta is what used to apply GI.
+
+PBGI area is what you used to adjust Rays and how they apply to the screen.
+			  
+Image area is what you used to adjust RadiantGI image output.
+
+Image area is what you used to adjust RadiantGI image output.
+
+Depth Map area is what you used to adjust Depth Buffer for this shader
+
+Extra Options is used for debuffing the information above.
+
+For more options and information please go inside the shader and read.	

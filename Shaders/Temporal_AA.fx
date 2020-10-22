@@ -252,11 +252,11 @@ float4 TAA(float2 texcoord)
     antialiased = lerp(antialiased * antialiased, BB * BB, mixRate);
     antialiased = sqrt(antialiased);
 
-	const float2 XYoffset[9] = { float2( 0, 0 ), float2( 0,+pix.y ), float2( 0,-pix.y), float2(+pix.x, 0), float2(-pix.x, 0), float2(-pix.x,-pix.y), float2(+pix.x,-pix.y), float2(-pix.x,+pix.y), float2(+pix.x,+pix.y) };
+	const float2 XYoffset[8] = { float2( 0,+pix.y ), float2( 0,-pix.y), float2(+pix.x, 0), float2(-pix.x, 0), float2(-pix.x,-pix.y), float2(+pix.x,-pix.y), float2(-pix.x,+pix.y), float2(+pix.x,+pix.y) };
 
 	float3 minColor = encodePalYuv(tex2D(BackBuffer, texcoord + XYoffset[0] ).rgb) - MB;
 	float3 maxColor = encodePalYuv(tex2D(BackBuffer, texcoord + XYoffset[0] ).rgb) + MB;
-	for(int i = 1; i < 9; ++i)
+	for(int i = 1; i < 8; ++i)
 	{ //DX9 work around.
 		minColor = min(minColor,encodePalYuv(tex2Dlod(BackBuffer, float4(texcoord + XYoffset[i],0,0)).rgb)) - MB;
 		maxColor = max(maxColor,encodePalYuv(tex2Dlod(BackBuffer, float4(texcoord + XYoffset[i],0,0)).rgb)) + MB;
@@ -269,7 +269,7 @@ float4 TAA(float2 texcoord)
     mixRate = rcp(1.0 / mixRate + 1.0);
 
     float3 diff = antialiased - preclamping;
-    
+
     diff.x = dot(diff,diff);
 
     float clampAmount = diff.x;
@@ -301,9 +301,9 @@ void Out(float4 position : SV_Position, float2 texcoord : TEXCOORD, out float4 c
 		Per *= 1-abs(Delta_Power);
 		Mask = max(saturate(length(Delta == 2 ? DM : M) * 50.0),length(Per));
 	}
-	
+
 	Color = TAA(texcoord);
-	
+
 	if(Debug == 1)
 	Color = float4(1,0,0,1);
 	if(Debug == 2)
@@ -311,9 +311,9 @@ void Out(float4 position : SV_Position, float2 texcoord : TEXCOORD, out float4 c
 		Color = float4(1,0,0,1);
 		Mask = Depth_CutOff < 0 ? 1-DepthM(texcoord).x : DepthM(texcoord).x;
 	}
-	
+
   float4 T_A_A = Delta_Power < 0 ? lerp(Color,C,saturate(Mask)) : lerp(C,Color,saturate(Mask));
-  
+
 	#if App_Sync
   if(texcoord.x < pix.x * Scale && 1-texcoord.y < pix.y * Scale)
     T_A_A = Alternate ? 0 : 1; //Jak0bW Suggestion for Mouse Jiggle Wiggle
