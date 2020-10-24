@@ -38,6 +38,8 @@
 //   https://www.shadertoy.com/view/wtsSW4
 // Text rendering code by Hamneggs
 //   https://www.shadertoy.com/view/4dtGD2
+// A slightly faster buffer-less vertex shader trick by CeeJay.dk
+//   https://www.reddit.com/r/gamedev/comments/2j17wk/a_slightly_faster_bufferless_vertex_shader_trick/
 //
 // If I missed any please tell me.
 //
@@ -78,7 +80,12 @@
 //
 // Oh if you can make a 2nd Bounce almost as fast as One Bounce....... Do it with your magic you wizard.
 //
-// Write your name and changes made here.
+// Write your name and changes/notes below.
+// ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Lord of Lunacy - https://github.com/LordOfLunacy
+// Reveil DeHaze Masking was inserted around GI Creation. Around Line 786
+//
+// __________________________________________________________________________________________________________________________________________________________________________________
 //
 // Upcoming Updates.............................................no guarantee
 // Need to add indirect color from the sky.
@@ -140,13 +147,19 @@
 #else
 	#define RGBA RGBA8
 #endif
+#if exists "ReVeil.fx"
+	#define Look_For_Buffers_ReVeil 1
+	#warning "ReVeil.fx Detected! Yoink! took your Transmission Buffer"
+#else
+	#define Look_For_Buffers_ReVeil 0
+#endif
 //Help / Guide Information stub uniform a idea from LucasM
 uniform int RadiantGI <
 	ui_text = "RadiantGI is an indirect lighting algorithm based on the disk-to-disk radiance transfer by Michael Bunnell.\n"
 			  		"As you can tell its name is a play on words and it radiates the kind of feeling I want from it one Ray Bounce at a time.\n"
 			  			  "This GI shader is free and shouldn't sit behind a paywall. If you paid for this shader ask for a refund right away.\n"
 			  			  		"As for my self I do want to provide the community with free shaders and any donations will help keep that motivation alive.\n"
-			  			  			  "For more information and please feel free to visit http://www.Depth3D.info or https://blueskydefender.github.io/AstrayFX.\n"
+			  			  			  "For more information and please feel free to visit http://www.Depth3D.info or https://blueskydefender.github.io/AstrayFX.\n "
 			  "Please enjoy this shader and Thank You for using RadiantGI.";
 	ui_category = "RadiantGI";
 	ui_category_closed = true;
@@ -292,6 +305,13 @@ uniform int Performance_Level <
 #else
 static const int Performance_Level = 3;
 #endif
+#if Look_For_Buffers_ReVeil
+	uniform bool UseReVeil<
+		ui_label = "Use Transmission from ReVeil";
+		ui_tooltip = "Requires ReVeil to be enabled (Lord of Lunacy waz here)";
+		ui_category = "Extra Options";
+	> = true;
+#endif
 #if DB_Size_Postion || SP == 2
 uniform float2 Horizontal_and_Vertical <
 	ui_type = "drag";
@@ -361,7 +381,7 @@ static const float Zoom = DC_W;
 #else
 		static const int Depth_Guide = 0;
 #endif
-//"Ray Printer Go Brrrrrrrrrrrrrrrrrrr.\n"
+//This GI shader is free and shouldn't sit behind a paywall. If you paid for this shader ask for a refund right away.
 #if Automatic_Resolution_Scaling //Automatic Adjustment based on Resolutionsup to 4k considered. LOL good luck with 8k in 2020
 	#undef RSRes
 	#if (BUFFER_HEIGHT <= 720)
@@ -475,7 +495,7 @@ sampler ZBuffer
 
 texture BackBufferTex : COLOR;
 
-sampler BackBuffer
+sampler BackBufferPBGI
 	{
 		Texture = BackBufferTex;
 	};
@@ -499,21 +519,27 @@ sampler2D PBGIcurrDepth { Texture = PBGIcurrDepthTex;};
 texture2D PBGIcurrNormalsTex < pooled = true; >{ Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;};
 sampler2D PBGIcurrNormals { Texture = PBGIcurrNormalsTex; };
 
-texture2D RadiantGITex < pooled = true; > { Width = BUFFER_WIDTH * RSRes ; Height = BUFFER_HEIGHT * RSRes ; Format = RGBA; };
+texture2D RadiantGITex  { Width = BUFFER_WIDTH * RSRes ; Height = BUFFER_HEIGHT * RSRes ; Format = RGBA; };
 sampler2D PBGI_Info { Texture = RadiantGITex; };
 
 texture2D PBGIupsampleTex < pooled = true; > { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA;};
 sampler2D PBGIupsample_Info { Texture = PBGIupsampleTex; };
 
-texture2D PBGIbackbufferTex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA;  MipLevels = 4;};
+texture2D PBGIbackbufferTex < pooled = true; > { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA;  MipLevels = 4;};
 sampler2D PBGIbackbuffer_Info { Texture = PBGIbackbufferTex; };
 
-texture2D PBGIhorizontalTex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA;};
+texture2D PBGIhorizontalTex < pooled = true; > { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA;};
 sampler2D PBGI_BGUHorizontal_Sample { Texture = PBGIhorizontalTex;};
 #if Foced_SNM
-texture2D PBGIsmoothnormalsTex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f;};
+texture2D PBGIsmoothnormalsTex < pooled = true; > { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f;};
 sampler2D PBGI_Smooth_Normals { Texture = PBGIsmoothnormalsTex;};
 #endif
+
+#if Look_For_Buffers_ReVeil
+texture Transmission { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = R16f; };
+sampler2D ReVeilTransmission {Texture = Transmission;};
+#endif
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 float Depth_Info(float2 texcoord)
 {
@@ -678,9 +704,9 @@ void FormFactor(inout float3 GI,inout float3 II,in float2 texcoord,in float3 dif
 	float4 V = float4(normalize(-diff), length(-diff));
 	float3 Global_Illumination = saturate(100.0 * saturate( dot(NormalsMap(texcoord+float2(c1,c2),2),-V.xyz)) * saturate(dot( normals, V.xyz )) /((1000*Trim)*(V.w*V.w)+1.0) ), Irradiance_Information = Saturator(II);
 	GI += Global_Illumination * Irradiance_Information;
-	//PBAO would be added here...... But, I removed this. A effect that has GI in the name should only be GI. This can be added in later and will be added in later as an other shader.
+	//PBAO would be added here...... But, I removed this. A effect that has GI in the name should only be GI. This can be added in later and willbe added in later as an other shader.
 /*
-// Base code for GI Form Factor used here. A few difrences. But, I wanted this here just incase you need help. Trying to be as open as I can.
+// Base code for GI Form Factor used here.There are a few differences. But, I wanted this here just incase you need help.
 float3 v = float3(dot(vw, tangent), dot(vw, biangent), dot(vw, normal));
 float3 si = pow(float3(dot(v, r1), dot(v, r2), dot(v, r3)), smoothness);
 diffuse += specularColor*(ir1*si.x + ir2*si.y + ir3*si.z);
@@ -750,7 +776,14 @@ float4 PBGI(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Targ
 
 	GI *= rcp(samples);
 
-	return float4(RGBtoYCbCr( (GI * ( lerp(Near_Far.y,Near_Far.x, 1-D ) * min(GI_Power.x,2.0) ))), 1);
+	float4 output = float4(RGBtoYCbCr( (GI * ( lerp(Near_Far.y,Near_Far.x, 1-D ) * min(GI_Power.x,2.0) ))), 1);
+	#if Look_For_Buffers_ReVeil //Lord of Lunacy DeHaze insertion was here.
+	if(UseReVeil)
+	{
+		output.r *= tex2D(ReVeilTransmission, texcoord).r;
+	}
+	#endif
+	return output;
 }
 
 float4 GIAdjusted(float2 TC, int Mip)
@@ -796,7 +829,7 @@ void Upsample(float4 vpos : SV_Position, float2 texcoord : TEXCOORD, out float4 
 	DepthMask = 1-saturate(150 * DepthMask + 1.0 - 150);
 	// Divide by total sum to get final GI
 	UpGI = fTotalGI / fTotalWeight;
-	ColorOut = float4(tex2D(BackBuffer,texcoord).rgb,DepthMask);
+	ColorOut = float4(tex2D(BackBufferPBGI,texcoord).rgb,DepthMask);
 	SN = SmoothNormals(texcoord, SN_offset.x, 0, SN_offset.y);
 }
 
@@ -807,7 +840,6 @@ float3 GI(float2 TC)
 	MCNoise( Noise.y, framecount, TC, 2 );
 	MCNoise( Noise.z, framecount, TC, 3 );
 	#warning "For updates and or the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info"
-	#warning "Ray Printer Go Brrrrrrrrrrrrrrrrrrr"
 	float3 N = Noise * 0.5 + 0.5;
 	return tex2Dlod(PBGIupsample_Info, float4(TC,0,0)).xyz * N;
 }
@@ -860,7 +892,7 @@ float3 Capture_TAA(float2 texcoord)
 	MCNoise( Noise.z, 3, texcoord, 3 );
 
 	float3 N = Noise * 0.25 + 0.5;
-	return Disable_TAA ? GI(texcoord) * N : tex2Dlod(BackBuffer, float4(texcoord,0,0)).rgb;
+	return Disable_TAA ? GI(texcoord) * N : tex2Dlod(BackBufferPBGI, float4(texcoord,0,0)).rgb;
 }
 //Joint Bilateral Gaussian Upscaling
 float3 JointBGU(float2 TC, int SamplesXY,int Dir)
@@ -910,7 +942,9 @@ float3 Composite(float2 texcoord)
 #endif
 {
 	float3 Output = JBGU(texcoord);
+
 	float3 Color = tex2D(PBGIbackbuffer_Info,texcoord).rgb, FiftyGray = Output + 0.5;
+
 	#if Controlled_Blend
 		return (lerp( overlay( Color,  FiftyGray), softlight( Color,  FiftyGray), Blend)+ add( Color,  Output)) / 2 ;
 	#else
@@ -925,11 +959,7 @@ float3 Composite(float2 texcoord)
 
 float3 MixOut(float2 texcoords)
 {
-	#if Recursion_Mode
-	float3 Layer = tex2D(Composite_Sample,texcoords).rgb;
-	#else
 	float3 Layer = Composite(texcoords).rgb;
-	#endif
 	float Depth = DepthMap(texcoords,0), FakeAO = Debug == 1 || Depth_Guide ? (Depth + DepthMap(texcoords + float2(pix.x * 2,0),1) + DepthMap(texcoords + float2(-pix.x * 2,0),2) + DepthMap(texcoords + float2(0,pix.y * 2),Depth_Guide ? 3 : 8)  + DepthMap(texcoords + float2(0,-pix.y * 2),Depth_Guide ? 4 : 10) ) * 0.2 : 0;
 
 	float3 Output = JBGU(texcoords);
@@ -1248,11 +1278,11 @@ float3 Out(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Targe
 
 void CurrentFrame(float4 vpos : SV_Position, float2 texcoord : TEXCOORD, out float4 Color : SV_Target0, out float3 Depth : SV_Target1, out float3 Normals : SV_Target2)
 {
-	float4 BC = tex2D(BackBuffer,texcoord).rgba;
+	float4 BC = tex2D(BackBufferPBGI,texcoord).rgba;
 	if(HDR_BP > 0)
 		BC.rgb = inv_Reinhard(float4(BC.rgb,1-HDR_BP));
 
-	float DI = Depth_Info(texcoord), GS = dot(tex2D(BackBuffer,texcoord).rgb,0.333);//Intencity
+	float DI = Depth_Info(texcoord), GS = dot(tex2D(BackBufferPBGI,texcoord).rgb,0.333);//Intencity
 	Color = float4(lerp(BC.rgb ,0, smoothstep(0,1,DI) > MaxDepth_Cutoff ), GS) ;
 	Depth = DI;
 	Normals = SmoothNormals(texcoord, SN_offset.x, 1, SN_offset.y);
@@ -1260,7 +1290,7 @@ void CurrentFrame(float4 vpos : SV_Position, float2 texcoord : TEXCOORD, out flo
 #if !Disable_TAA
 void AccumulatedFrames(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 acc : SV_Target)
 {
-	acc = tex2D(BackBuffer,texcoords).rgba;
+	acc = tex2D(BackBufferPBGI,texcoords).rgba;
 }
 void PreviousFrames(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 prev : SV_Target)
 {
