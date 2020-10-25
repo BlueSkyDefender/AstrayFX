@@ -487,10 +487,10 @@ float ColTone(float x, float4 p)
 float3 TimothyTonemapper(float3 color, float EX)
 {
     float hdrMax =  HDR_Toggle ? 25.0 : 16.0; // How much HDR range before clipping. HDR modes likely need this pushed up to say 25.0.
-    static float contrast = Contrast + 0.250; // Use as a baseline to tune the amount of contrast the tonemapper has.
+    float contrast = Contrast + 0.250; // Use as a baseline to tune the amount of contrast the tonemapper has.
     static float shoulder = 1.0; // Likely don't need to mess with this factor, unless matching existing tonemapper is not working well..
     static float midIn = 0.11; // most games will have a {0.0 to 1.0} range for LDR so midIn should be 0.18.But,I settled around 0.11
-    static float midOut = HDR_Toggle ? 0.18/25.0 : 0.18; // Use for LDR. For HDR10 10:10:10:2 use maybe 0.18/25.0 to start. For scRGB, I forget what a good starting point is, need to re-calculate.
+    float midOut = HDR_Toggle ? 0.18/25.0 : 0.18; // Use for LDR. For HDR10 10:10:10:2 use maybe 0.18/25.0 to start. For scRGB, I forget what a good starting point is, need to re-calculate.
 
     float b = ColToneB(hdrMax, contrast, shoulder, midIn, midOut);
     float c = ColToneC(hdrMax, contrast, shoulder, midIn, midOut);

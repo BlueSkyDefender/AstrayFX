@@ -149,7 +149,7 @@
 #endif
 #if exists "ReVeil.fx"
 	#define Look_For_Buffers_ReVeil 1
-	#warning "ReVeil.fx Detected! Yoink! took your Transmission Buffer"
+	#warning "ReVeil.fx Detected! Yoink! Took your Transmission Buffer"
 #else
 	#define Look_For_Buffers_ReVeil 0
 #endif
@@ -704,7 +704,8 @@ void FormFactor(inout float3 GI,inout float3 II,in float2 texcoord,in float3 dif
 	float4 V = float4(normalize(-diff), length(-diff));
 	float3 Global_Illumination = saturate(100.0 * saturate( dot(NormalsMap(texcoord+float2(c1,c2),2),-V.xyz)) * saturate(dot( normals, V.xyz )) /((1000*Trim)*(V.w*V.w)+1.0) ), Irradiance_Information = Saturator(II);
 	GI += Global_Illumination * Irradiance_Information;
-	//PBAO would be added here...... But, I removed this. A effect that has GI in the name should only be GI. This can be added in later and willbe added in later as an other shader.
+	//PBAO would be added here...... But, I removed this. A effect that has GI in the name should only be GI. This can be added in later and will be added in later as an other shader.
+	//AO += (1.0-clamp(dot(NormalsMap(texcoord+float2(c1,c2),2),-V.xyz),0.0,1.0)) * clamp(dot( normals,V.xyz ),-1.0,1.0) * (1.0 - 1.0/sqrt(1.0/(V.w*V.w) + 1.0)); < not 100% correct.
 /*
 // Base code for GI Form Factor used here.There are a few differences. But, I wanted this here just incase you need help.
 float3 v = float3(dot(vw, tangent), dot(vw, biangent), dot(vw, normal));
@@ -935,16 +936,9 @@ float3 overlay(float3 c, float3 b) 		{ return c<0.5f ? 2.0f*c*b:(1.0f-2.0f*(1.0f
 float3 softlight(float3 c, float3 b) 	{ return b<0.5f ? (2.0f*c*b+c*c*(1.0f-2.0f*b)):(sqrt(c)*(2.0f*b-1.0f)+2.0f*c*(1.0f-b));}
 float3 add(float3 c, float3 b) 	{ return c + (b * 0.5);}
 
-#if Recursion_Mode
-float3 Composite(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
-#else
 float3 Composite(float2 texcoord)
-#endif
 {
-	float3 Output = JBGU(texcoord);
-
-	float3 Color = tex2D(PBGIbackbuffer_Info,texcoord).rgb, FiftyGray = Output + 0.5;
-
+	float3 Output = JBGU(texcoord), Color = tex2D(PBGIbackbuffer_Info,texcoord).rgb, FiftyGray = Output + 0.5;
 	#if Controlled_Blend
 		return (lerp( overlay( Color,  FiftyGray), softlight( Color,  FiftyGray), Blend)+ add( Color,  Output)) / 2 ;
 	#else
