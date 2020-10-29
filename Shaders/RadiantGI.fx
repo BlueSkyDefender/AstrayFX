@@ -859,14 +859,15 @@ void TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 colo
 
 	antialiased = lerp(antialiased * antialiased, CurrAOGI.rgb * CurrAOGI.rgb, mixRate);
 	antialiased = sqrt(antialiased);
-	float DA =  Denoiser_Power == 1 ? lerp(4,1,Mask(texcoords)) : 4;
+
+	float Denoise_Adjustment = Denoiser_Power == 1 ? lerp(4,1,Mask(texcoords)) : 4;
 
 	float3 minColor = CurrAOGI - MB;
 	float3 maxColor = CurrAOGI + MB;
 
 	[unroll]
 	for(int i = 0; i < 8; ++i)
-	{ float2 Offset = XYoffset[i] * (RSRes + DA);
+	{   float2 Offset = XYoffset[i] * (RSRes + Denoise_Adjustment);
 		float3 GISamples = GI(texcoords + Offset ).rgb;
 		minColor = min(minColor,GISamples) - MB;
 		maxColor = max(maxColor,GISamples) + MB;
