@@ -117,7 +117,7 @@
 #define RSRes 1.0 //[0.5 - 1.0]                     Noise start too takes over around 0.666 at 1080p..... Higher the res lower the noise.
 
 //Depth Buffer Adjustments
-#define DB_Size_Postion 0      //[Off | On]         This is used to repostion and the size of the depth buffer.
+#define DB_Size_Position 0     //[Off | On]         This is used to reposition and the size of the depth buffer.
 #define BD_Correction 0        //[Off | On]         Barrel Distortion Correction for non conforming BackBuffer.
 
 //TAA Quality Level
@@ -312,7 +312,7 @@ static const int Performance_Level = 3;
 		ui_category = "Extra Options";
 	> = true;
 #endif
-#if DB_Size_Postion || SP == 2
+#if DB_Size_Position || SP == 2
 uniform float2 Horizontal_and_Vertical <
 	ui_type = "drag";
 	ui_min = 0.0; ui_max = 2;
@@ -372,7 +372,7 @@ uniform float Zoom <
 static const float3 Colors_K1_K2_K3 = float3(DC_X,DC_Y,DC_Z);
 static const float Zoom = DC_W;
 #endif
-#if BD_Correction || DB_Size_Postion
+#if BD_Correction || DB_Size_Position
 	uniform bool Depth_Guide <
 		ui_label = "Alinement Guide";
 		ui_tooltip = "Use this for a guide for alinement.";
@@ -550,7 +550,7 @@ float Depth_Info(float2 texcoord)
 		texcoord = D(texcoord.xy,K123.x,K123.y,K123.z);
 	}
 	#endif
-	#if DB_Size_Postion || SP || LBC || LB_Correction
+	#if DB_Size_Position || SP || LBC || LB_Correction
 		texcoord.xy += float2(-Image_Position_Adjust.x,Image_Position_Adjust.y)*0.5;
 	#if LBC || LB_Correction
 		float2 H_V = Horizontal_and_Vertical * float2(1,LBDetection() ? 1.315 : 1 );
