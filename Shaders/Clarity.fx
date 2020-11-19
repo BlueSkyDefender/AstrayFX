@@ -94,7 +94,7 @@ sampler ClaritySampler3 { Texture = ClarityTex3;};
 float3 ClarityFinal(in float4 pos : SV_Position, in float2 texcoord : TEXCOORD) : COLOR
 {
 
-	float color = tex2D(ClaritySampler3, texcoord).r;
+	float color = tex2Dlod(ClaritySampler3, float4(texcoord,0,1)).r;
 	
 if(ClarityRadius == 0)	
 {
@@ -106,8 +106,8 @@ if(ClarityRadius == 0)
 	[loop]
 	for(int i = 1; i < 4; ++i)
 	{
-		color += tex2D(ClaritySampler3, texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset).r * weight[i];
-		color += tex2D(ClaritySampler3, texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset).r * weight[i];
+		color += tex2Dlod(ClaritySampler3, float4(texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r * weight[i];
+		color += tex2Dlod(ClaritySampler3, float4(texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r * weight[i];
 	}
 }	
 
@@ -121,8 +121,8 @@ if(ClarityRadius == 1)
 	[loop]
 	for(int i = 1; i < 6; ++i)
 	{
-		color += tex2D(ClaritySampler3, texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset).r * weight[i];
-		color += tex2D(ClaritySampler3, texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset).r * weight[i];
+		color += tex2Dlod(ClaritySampler3, float4(texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r * weight[i];
+		color += tex2Dlod(ClaritySampler3, float4(texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r * weight[i];
 	}
 }	
 
@@ -136,8 +136,8 @@ if(ClarityRadius == 2)
 	[loop]
 	for(int i = 1; i < 11; ++i)
 	{
-		color += tex2D(ClaritySampler3, texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset).r * weight[i];
-		color += tex2D(ClaritySampler3, texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset).r * weight[i];
+		color += tex2Dlod(ClaritySampler3, float4(texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r * weight[i];
+		color += tex2Dlod(ClaritySampler3, float4(texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r * weight[i];
 	}
 }	
 
@@ -151,8 +151,8 @@ if(ClarityRadius == 3)
 	[loop]
 	for(int i = 1; i < 15; ++i)
 	{
-		color += tex2D(ClaritySampler3, texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset).r * weight[i];
-		color += tex2D(ClaritySampler3, texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset).r * weight[i];
+		color += tex2Dlod(ClaritySampler3, float4(texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r * weight[i];
+		color += tex2Dlod(ClaritySampler3, float4(texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r * weight[i];
 	}
 }
 
@@ -166,12 +166,12 @@ if(ClarityRadius == 4)
 	[loop]
 	for(int i = 1; i < 18; ++i)
 	{
-		color += tex2D(ClaritySampler3, texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset).r * weight[i];
-		color += tex2D(ClaritySampler3, texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset).r * weight[i];
+		color += tex2Dlod(ClaritySampler3, float4(texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r * weight[i];
+		color += tex2Dlod(ClaritySampler3, float4(texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r * weight[i];
 	}
 }	
 	
-	float3 orig = tex2D(BackBuffer, texcoord).rgb; //Original Image
+	float3 orig = tex2Dlod(BackBuffer, float4(texcoord,0,0)).rgb; //Original Image
 	float luma = dot(orig.rgb,float3(0.32786885,0.655737705,0.0163934436));
 	float3 chroma = orig.rgb/luma;
 	
@@ -270,7 +270,7 @@ if(ClarityRadius == 4)
 
 float Clarity1(in float4 pos : SV_Position, in float2 texcoord : TEXCOORD) : COLOR
 {
-	float3 color = tex2D(BackBuffer, texcoord).rgb;
+	float3 color = tex2Dlod(BackBuffer, float4(texcoord,0,0)).rgb;
 	
 if(ClarityRadius == 0)	
 {
@@ -282,8 +282,8 @@ if(ClarityRadius == 0)
 	[loop]
 	for(int i = 1; i < 4; ++i)
 	{
-		color += tex2D(BackBuffer, texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset).rgb * weight[i];
-		color += tex2D(BackBuffer, texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset).rgb * weight[i];
+		color += tex2Dlod(BackBuffer, float4(texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).rgb * weight[i];
+		color += tex2Dlod(BackBuffer, float4(texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).rgb * weight[i];
 	}
 }	
 
@@ -297,8 +297,8 @@ if(ClarityRadius == 1)
 	[loop]
 	for(int i = 1; i < 6; ++i)
 	{
-		color += tex2D(BackBuffer, texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset).rgb * weight[i];
-		color += tex2D(BackBuffer, texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset).rgb * weight[i];
+		color += tex2Dlod(BackBuffer, float4(texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).rgb * weight[i];
+		color += tex2Dlod(BackBuffer, float4(texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).rgb * weight[i];
 	}
 }	
 
@@ -312,8 +312,8 @@ if(ClarityRadius == 2)
 	[loop]
 	for(int i = 1; i < 11; ++i)
 	{
-		color += tex2D(BackBuffer, texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset).rgb * weight[i];
-		color += tex2D(BackBuffer, texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset).rgb * weight[i];
+		color += tex2Dlod(BackBuffer, float4(texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).rgb * weight[i];
+		color += tex2Dlod(BackBuffer, float4(texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).rgb * weight[i];
 	}
 }	
 
@@ -327,8 +327,8 @@ if(ClarityRadius == 3)
 	[loop]
 	for(int i = 1; i < 15; ++i)
 	{
-		color += tex2D(BackBuffer, texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset).rgb * weight[i];
-		color += tex2D(BackBuffer, texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset).rgb * weight[i];
+		color += tex2Dlod(BackBuffer, float4(texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).rgb * weight[i];
+		color += tex2Dlod(BackBuffer, float4(texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).rgb * weight[i];
 	}
 }	
 
@@ -342,8 +342,8 @@ if(ClarityRadius == 4)
 	[loop]
 	for(int i = 1; i < 18; ++i)
 	{
-		color += tex2D(BackBuffer, texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset).rgb * weight[i];
-		color += tex2D(BackBuffer, texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset).rgb * weight[i];
+		color += tex2Dlod(BackBuffer, float4(texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).rgb * weight[i];
+		color += tex2Dlod(BackBuffer, float4(texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).rgb * weight[i];
 	}
 }	
 	
@@ -352,7 +352,7 @@ if(ClarityRadius == 4)
 
 float Clarity2(in float4 pos : SV_Position, in float2 texcoord : TEXCOORD) : COLOR
 {
-	float color = tex2D(ClaritySampler, texcoord).r;
+	float color = tex2Dlod(ClaritySampler, float4(texcoord,0,0)).r;
 	
 if(ClarityRadius == 0)	
 {
@@ -364,8 +364,8 @@ if(ClarityRadius == 0)
 	[loop]
 	for(int i = 1; i < 4; ++i)
 	{
-		color += tex2D(ClaritySampler, texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset).r* weight[i];
-		color += tex2D(ClaritySampler, texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset).r* weight[i];
+		color += tex2Dlod(ClaritySampler, float4(texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r* weight[i];
+		color += tex2Dlod(ClaritySampler, float4(texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r* weight[i];
 	}
 }	
 
@@ -379,8 +379,8 @@ if(ClarityRadius == 1)
 	[loop]
 	for(int i = 1; i < 6; ++i)
 	{
-		color += tex2D(ClaritySampler, texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset).r* weight[i];
-		color += tex2D(ClaritySampler, texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset).r* weight[i];
+		color += tex2Dlod(ClaritySampler, float4(texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r* weight[i];
+		color += tex2Dlod(ClaritySampler, float4(texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r* weight[i];
 	}
 }	
 
@@ -394,8 +394,8 @@ if(ClarityRadius == 2)
 	[loop]
 	for(int i = 1; i < 11; ++i)
 	{
-		color += tex2D(ClaritySampler, texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset).r* weight[i];
-		color += tex2D(ClaritySampler, texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset).r* weight[i];
+		color += tex2Dlod(ClaritySampler, float4(texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r* weight[i];
+		color += tex2Dlod(ClaritySampler, float4(texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r* weight[i];
 	}
 }	
 
@@ -409,8 +409,8 @@ if(ClarityRadius == 3)
 	[loop]
 	for(int i = 1; i < 15; ++i)
 	{
-		color += tex2D(ClaritySampler, texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset).r* weight[i];
-		color += tex2D(ClaritySampler, texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset).r* weight[i];
+		color += tex2Dlod(ClaritySampler, float4(texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r* weight[i];
+		color += tex2Dlod(ClaritySampler, float4(texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r* weight[i];
 	}
 }
 
@@ -424,8 +424,8 @@ if(ClarityRadius == 4)
 	[loop]
 	for(int i = 1; i < 18; ++i)
 	{
-		color += tex2D(ClaritySampler, texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset).r* weight[i];
-		color += tex2D(ClaritySampler, texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset).r* weight[i];
+		color += tex2Dlod(ClaritySampler, float4(texcoord + float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r* weight[i];
+		color += tex2Dlod(ClaritySampler, float4(texcoord - float2(0.0, offset[i] * pix.y) * ClarityOffset,0,0)).r* weight[i];
 	}
 }	
 
@@ -434,7 +434,7 @@ if(ClarityRadius == 4)
 
 float Clarity3(in float4 pos : SV_Position, in float2 texcoord : TEXCOORD) : COLOR
 {
-	float color = tex2D(ClaritySampler2, texcoord).r;
+	float color = tex2Dlod(ClaritySampler2, float4(texcoord,0,0)).r;
 	
 if(ClarityRadius == 0)	
 {
@@ -446,8 +446,8 @@ if(ClarityRadius == 0)
 	[loop]
 	for(int i = 1; i < 4; ++i)
 	{
-		color += tex2D(ClaritySampler2, texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset).r* weight[i];
-		color += tex2D(ClaritySampler2, texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset).r* weight[i];
+		color += tex2Dlod(ClaritySampler2, float4(texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).r* weight[i];
+		color += tex2Dlod(ClaritySampler2, float4(texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).r* weight[i];
 	}
 }	
 
@@ -461,8 +461,8 @@ if(ClarityRadius == 1)
 	[loop]
 	for(int i = 1; i < 6; ++i)
 	{
-		color += tex2D(ClaritySampler2, texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset).r* weight[i];
-		color += tex2D(ClaritySampler2, texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset).r* weight[i];
+		color += tex2Dlod(ClaritySampler2, float4(texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).r* weight[i];
+		color += tex2Dlod(ClaritySampler2, float4(texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).r* weight[i];
 	}
 }	
 
@@ -476,8 +476,8 @@ if(ClarityRadius == 2)
 	[loop]
 	for(int i = 1; i < 11; ++i)
 	{
-		color += tex2D(ClaritySampler2, texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset).r* weight[i];
-		color += tex2D(ClaritySampler2, texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset).r* weight[i];
+		color += tex2Dlod(ClaritySampler2, float4(texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).r* weight[i];
+		color += tex2Dlod(ClaritySampler2, float4(texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).r* weight[i];
 	}
 }	
 
@@ -491,8 +491,8 @@ if(ClarityRadius == 3)
 	[loop]
 	for(int i = 1; i < 15; ++i)
 	{
-		color += tex2D(ClaritySampler2, texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset).r* weight[i];
-		color += tex2D(ClaritySampler2, texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset).r* weight[i];
+		color += tex2Dlod(ClaritySampler2, float4(texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).r* weight[i];
+		color += tex2Dlod(ClaritySampler2, float4(texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).r* weight[i];
 	}
 }	
 
@@ -506,8 +506,8 @@ if(ClarityRadius == 4)
 	[loop]
 	for(int i = 1; i < 18; ++i)
 	{
-		color += tex2D(ClaritySampler2, texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset).r* weight[i];
-		color += tex2D(ClaritySampler2, texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset).r* weight[i];
+		color += tex2Dlod(ClaritySampler2, float4(texcoord + float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).r* weight[i];
+		color += tex2Dlod(ClaritySampler2, float4(texcoord - float2(offset[i] * pix.x, 0.0) * ClarityOffset,0,0)).r* weight[i];
 	}
 }	
 	
