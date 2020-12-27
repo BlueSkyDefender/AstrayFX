@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 2.1
+//For Reshade 3.0+ PCGI Ver 2.2
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -130,6 +130,10 @@
 // Update 2.1
 // Small changes to help guide the user a bit more with SSLT.
 //
+// Update 2.2
+// More Pooled Texture issues. Black screen is shown when Pooling some textures. Issue now is that this shader uses around 605.0 MiB at 4k...... 
+// Need to talk to the main man about this. When time allows.
+// 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #if exists "Overwatch.fxh"                                           //Overwatch Interceptor//
 	#include "Overwatch.fxh"
@@ -822,8 +826,8 @@ sampler2D PCGIpastFrame { Texture = PCGIpastTex;
 
 texture2D PCGIaccuTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; };
 sampler2D PCGIaccuFrames { Texture = PCGIaccuTex; };
-
-texture2D PCGIcurrColorTex < pooled = true; >{ Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;};
+//Seen issues whe pooling this texture...... Seems to be  ReShade bug that show when Pooling The textures on this one here.
+texture2D PCGIcurrColorTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;};
 sampler2D PCGIcurrColor { Texture = PCGIcurrColorTex; };
 
 texture2D PCGIcurrNormalsDepthTex < pooled = true; >{ Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;};
