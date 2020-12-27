@@ -42,7 +42,7 @@
 //*
 //* LICENSE
 //* ============
-//* Blooming HDR is licenses under: Attribution-NoDerivatives 4.0 International
+//* Overwatch & Blooming HDR is licenses under: Attribution-NoDerivatives 4.0 International
 //*
 //* You are free to:
 //* Share - copy and redistribute the material in any medium or format
@@ -63,14 +63,24 @@
 //*
 //* https://github.com/BlueSkyDefender/Depth3D
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#if exists "Overwatch.fxh"                                           //Overwatch Interceptor//
+	#include "Overwatch.fxh"
+	#define OS 0
+#else// DA_Y = [Depth Adjust] DA_Z = [Offset] DA_W = [Depth Linearization] DB_X = [Depth Flip]
+	static const float DA_Y = 7.5, DA_Z = 0.0, DA_W = 0.0, DB_X = 0;
+	// DD_X = [Horizontal Size] DD_Y = [Vertical Size] DD_Z = [Horizontal Position] DD_W = [Vertical Position]
+	static const float DD_X = 1, DD_Y = 1, DD_Z = 0.0, DD_W = 0.0;
+	//Overwatch.fxh State
+	#define OS 1
+#endif
 //Shared Texture for Blooming HDR or any other shader that want's to use it.
-#if exists "Flair.fx"                                           //Flair Intercepter//
+#if exists "Flair.fx"                                                   //Flair Interceptor//
 	#define Flare_A 1
 #else
 	#define Flare_A 0
 #endif
 
-#if exists "Flare.fx"                                           //Flare Intercepter//
+#if exists "Flare.fx"                                                   //Flare Interceptor//
 	#define Flare_B 1
 #else
 	#define Flare_B 0
@@ -84,6 +94,10 @@
 
 // Change this to set enable SRGB mode.
 #define SRGB 0
+
+//Depth Buffer Adjustments
+#define DB_Size_Position 0     //[Off | On]         This is used to reposition and the size of the depth buffer.
+#define BD_Correction 0        //[Off | On]         Barrel Distortion Correction for non conforming BackBuffer.
 
 //Do not Use.
 //Use for real HDR.
@@ -121,7 +135,19 @@ uniform float CBT_Adjust <
 	ui_category = "Bloom Adjustments";
 > = 0.5;
 
-uniform float2 Bloom_Intensity<
+uniform float2 NFCD <
+	ui_type = "slider";
+	ui_min = 0.0; ui_max = 1.0;
+	ui_label = "Bloom Intensity Isolation";
+	ui_tooltip = "Lets you adjust Bloom Intensity near and far away from the cam.\n"
+			     "The 1nd Option is for Weapon Hands Boom Isolation.\n"
+			     "The 2nd Option is for Sky Bloom Isolation.\n"
+			     //"The 3nd Option is for Intensity for both, Zero is off.\n"
+			     "Defaults are [Near Isolation X 0.0] [Far Isolation Y 1.0], Off";
+	ui_category = "Bloom Adjustments";
+> = float2(0.0,1.0);
+
+uniform float3 Bloom_Intensity<
 	#if Compatibility
 	ui_type = "drag";
 	#else
@@ -129,10 +155,11 @@ uniform float2 Bloom_Intensity<
 	#endif
 	ui_min = 0.0; ui_max = 1.0;
 		ui_label = "Bloom Intensity & Bloom Opacity";
-	ui_tooltip = "Use this to set Bloom Intensity and Overall Bloom Opacity for your content.\n"
+	ui_tooltip = "Use this to set Primary & Secondary Bloom Intensity and Overall Bloom Opacity for your content.\n"
+				"The 2nd Option only works when Bloom Intensity Isolation is set above.\n"
 				"Number 0.5 is default.";
 	ui_category = "Bloom Adjustments";
-> = float2(0.5,0.25);
+> = float3(0.5,0.5,0.25);
 
 uniform float2 Saturation <
 	#if Compatibility
@@ -154,7 +181,7 @@ uniform float Bloom_Spread <
 	ui_type = "slider";
 	#endif
 	ui_min = 5.0; ui_max = Bloom_Max; ui_step = 0.25;
-	ui_label = "Primary Bloom Spread";
+	ui_label = "Bloom Spread";
 	ui_tooltip = "Adjust to spread out the primary Bloom.\n"
 				 "This is used for spreading Bloom.\n"
 				 "Number 50.0 is default.";
@@ -169,7 +196,16 @@ uniform float Dither_Bloom <
        "Number 0.25 is default.";
  ui_category = "Bloom Adjustments";
 > = 0.25;
-
+/*
+uniform float FilmicBloom <
+ ui_type = "slider";
+ ui_min = 0.0; ui_max = 1.0;
+ ui_label = "Filmic Bloom";
+ ui_tooltip = "Adjustment for a Filmic Bloom look.\n"
+       "Number 0.0 is default Off.";
+ ui_category = "Bloom Adjustments";
+> = 0.0;
+*/
 uniform int Tonemappers <
 	ui_type = "combo";
 	ui_label = "Tonemappers";
@@ -239,7 +275,7 @@ uniform int Inv_Tonemappers <
 	ui_tooltip = "Changes how color get used for the other effects.\n";
 	ui_items = "Off\0[Low] Luma\0[Med] Color\0[High] Max Color Brightness\0";
 	ui_category = "HDR";
-> = 1;
+> = 2;
 
 uniform float HDR_BP <
 	ui_type = "drag";
@@ -277,10 +313,65 @@ uniform bool Eye_Adaptation <
 	ui_category = "Eye Adaptation";
 > = true;
 
+uniform int Depth_Map <
+	ui_type = "combo";
+	ui_items = "DM0 Normal\0DM1 Reversed\0";
+	ui_label = "Depth Map Selection";
+	ui_tooltip = "Linearization for the zBuffer also known as Depth Map.\n"
+			     "DM0 is Z-Normal and DM1 is Z-Reversed.\n";
+	ui_category = "Depth Map";
+> = DA_W;
+
+uniform float Depth_Map_Adjust <
+	ui_type = "drag";
+	ui_min = 1.0; ui_max = 250.0;
+	ui_label = "Depth Map Adjustment";
+	ui_tooltip = "This allows for you to adjust the DM precision.\n"
+				 "Adjust this to keep it as low as possible.\n"
+				 "Default is 7.5";
+	ui_category = "Depth Map";
+> = DA_Y;
+uniform float Offset <
+	ui_type = "drag";
+	ui_min = -1.0; ui_max = 1.0;
+	ui_label = "Depth Map Offset";
+	ui_tooltip = "Depth Map Offset is for non conforming ZBuffer.\n"
+				 "It is rare that you would need to use this option.\n"
+				 "Use this to make adjustments to DM 0 or DM 1.\n"
+				 "Default and starts at Zero and it is Off.";
+	ui_category = "Depth Map";
+> = DA_Z;
+
+uniform bool Depth_Map_Flip <
+	ui_label = "Depth Map Flip";
+	ui_tooltip = "Flip the depth map if it is upside down.";
+	ui_category = "Depth Map";
+> = DB_X;
+
+#if DB_Size_Position || SP == 2
+uniform float2 Horizontal_and_Vertical <
+	ui_type = "drag";
+	ui_min = 0.0; ui_max = 2;
+	ui_label = "Horizontal & Vertical Size";
+	ui_tooltip = "Adjust Horizontal and Vertical Resize. Default is 1.0.";
+	ui_category = "Depth Corrections";
+> = float2(DD_X,DD_Y);
+uniform float2 Image_Position_Adjust<
+	ui_type = "drag";
+	ui_min = -1.0; ui_max = 1.0;
+	ui_label = "Horizontal & Vertical Position";
+	ui_tooltip = "Adjust the Image Position if it's off by a bit. Default is Zero.";
+	ui_category = "Depth Corrections";
+> = float2(DD_Z,DD_W);
+#else
+static const float2 Horizontal_and_Vertical = float2(DD_X,DD_Y);
+static const float2 Image_Position_Adjust = float2(DD_Z,DD_W);
+#endif
+
 uniform int Debug_View <
 	ui_type = "combo";
 	ui_label = "Debug View";
-	ui_items = "Normal View\0Bloom View\0Heat Map\0";
+	ui_items = "Normal View\0Bloom View\0Heat Map\0Depth\0";
 	ui_tooltip = "To view Shade & Blur effect on the game, movie piture & ect.";
 	ui_category = "Debugging";
 > = 0;
@@ -288,7 +379,7 @@ uniform int Debug_View <
 /////////////////////////////////////////////////////D3D Starts Here/////////////////////////////////////////////////////////////////
 #define pix float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)
 #define BloomSpread Bloom_Spread * rcp(Bloom_Max)
-#define PP lerp(0.0,1.0, Petal_Power)
+#define DBP lerp(0.0,1.0,NFCD.z)
 #define Sat lerp(0,10,Saturation.x)
 #define PHI 1.61803398874989484820459 * 00000.1 // Golden Ratio
 #define PI 3.14159265358979323846264 * 00000.1 // PI
@@ -313,11 +404,11 @@ sampler BackBuffer
 		#endif
 	};
 
-texture texCurrent { Width = BUFFER_WIDTH * 0.5; Height = BUFFER_HEIGHT * 0.5; Format = RGBA8; MipLevels = 8;};
+texture texCurrColor { Width = BUFFER_WIDTH * 0.5; Height = BUFFER_HEIGHT * 0.5; Format = RGBA8; MipLevels = 8;};
 
-sampler SamplerCBB
+sampler SamplerCurrBB
 	{
-		Texture = texCurrent;
+		Texture = texCurrColor;
 	};
 
 texture texMBlur_HVA <pooled = true;>  { Width = BUFFER_WIDTH * Set_Res; Height = BUFFER_HEIGHT * 0.375; Format = RGBA16F; MipLevels = 8;};
@@ -352,6 +443,37 @@ sampler SamplerLensFlare
 #endif
 //Total amount of frames since the game started.
 uniform float frametime < source = "frametime";>;
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+float2 Depth_Info(float2 texcoord)
+{
+	if (Depth_Map_Flip)
+		texcoord.y =  1 - texcoord.y;
+
+	//Conversions to linear space.....
+	float N = NFCD.x ,zBuffer = tex2Dlod(DepthBuffer, float4(texcoord,0,0)).x, zBufferWH = zBuffer, Far = 1.0, Near = 0.125/Depth_Map_Adjust, NearWH = 0.125/(Depth_Map ? N : 10*N), OtherSettings = Depth_Map ? N : 100 * N ; //Near & Far Adjustment
+	//Man Why can't depth buffers Just Be Normal
+	float2 C = float2( Far / Near, 1.0 - Far / Near ), Z = Offset < 0 ? min( 1.0, zBuffer * ( 1.0 + abs(Offset) ) ) : float2( zBuffer, 1.0 - zBuffer ), Offsets = float2(1 + OtherSettings,1 - OtherSettings), zB = float2( zBufferWH, 1-zBufferWH );
+
+	if(Offset > 0 || Offset < 0)
+	Z = Offset < 0 ? float2( Z.x, 1.0 - Z.y ) : min( 1.0, float2( Z.x * (1.0 + Offset) , Z.y / (1.0 - Offset) ) );
+
+	if (N > 0)
+	zB = min( 1, float2( zB.x * Offsets.x , zB.y / Offsets.y  ));
+
+	if (Depth_Map == 0)
+	{   //DM0 Normal
+		zBuffer = rcp(Z.x * C.y + C.x);
+		zBufferWH = Far * NearWH / (Far + zB.x * (NearWH - Far));
+	}
+	else if (Depth_Map == 1)
+	{   //DM1 Reverse
+		zBuffer = rcp(Z.y * C.y + C.x);
+		zBufferWH = Far * NearWH / (Far + zB.y * (NearWH - Far));
+	}
+
+	return  float2(saturate( N > 0 ? zBufferWH : zBuffer ), zBuffer);
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 float Luma(float3 C)
@@ -576,9 +698,9 @@ float4 Color_GS(float4 BC)
     return saturate(float4(BC.rgb,GS));
 }
 
-void PS_CurrentInfo(float4 pos : SV_Position, float2 texcoords : TEXCOORD, out float4 Color : SV_Target0)//, out float4 bloom2 : SV_Target1)
-{
-	Color = Color_GS(tex2D(BackBuffer, texcoords));
+void PS_CurrentInfo(float4 pos : SV_Position, float2 texcoords : TEXCOORD, out float4 Color : SV_Target0)
+{   float2 D = Depth_Info(texcoords);
+	Color = float4(Color_GS(tex2D(BackBuffer, texcoords)).rgb, saturate(NFCD.x > 0 ? lerp(1, D.y > NFCD.y ,D.x) * 10 : D.y> NFCD.y));
 }
 
 float4 GemsBlur(sampler2D Sample, float2 texcoords, float Size, int Dir)
@@ -606,7 +728,7 @@ void Blur_HV0(in float4 position : SV_Position, in float2 texcoords : TEXCOORD, 
 {
 	float S0 = BloomSpread * 10.0;
 
-	color = GemsBlur(SamplerCBB, texcoords, S0, 0).rgba;
+	color = GemsBlur(SamplerCurrBB, texcoords, S0, 0).rgba;
 }
 
 void CombBlur_HV1(in float4 position : SV_Position, in float2 texcoords : TEXCOORD, out float4 color : SV_Target0 )
@@ -697,7 +819,7 @@ void GN(inout float Noise,float2 TC,float seed)
     Noise = frac(tan(distance(TC*((seed+10)+PHI), float2(PHI, PI)))*SQ2);
 }
 
-float4 HDROut(float2 texcoords : TEXCOORD0)
+float4 HDROut(float2 texcoords)
 {   float4 Out;
 	float2 TC = 10 * texcoords.xy - 5;
 	float AL = Auto_Luma().y, Ex;
@@ -707,13 +829,12 @@ float4 HDROut(float2 texcoords : TEXCOORD0)
 	else
 		Ex = lerp(0,2.5,Scale(Exp, 4, -4));
 
-	float BI_Brightness = lerp(1,0.001,Bloom_Intensity.x), NC = Bloom_Intensity.y;
+	float BI_Brightness_A = lerp(1,0.01,Bloom_Intensity.x), BI_Brightness_B = lerp(1,0.01,Bloom_Intensity.y), NC = Bloom_Intensity.z;
 
 	if(Auto_Bloom == 1 || Auto_Bloom == 4 || Auto_Bloom == 5)
 		NC *= max(0.25,Auto_Luma().x);
 
-	float3 Noise, Bloom = Final_Bloom( texcoords ).rgb,iFast, iReinhard, iReinhardLuma, Color = tex2D(BackBuffer, texcoords).rgb;
-
+	float3 Noise,Bloom_A, Bloom_B, Bloom = Final_Bloom( texcoords ).rgb,iFast, iReinhard, iReinhardLuma, Color = tex2D(BackBuffer, texcoords).rgb;
 	// Goldern Noise RGB Dither
 	GN( Noise.r, TC, 1 );
 	GN( Noise.g, TC, 2 );
@@ -724,7 +845,8 @@ float4 HDROut(float2 texcoords : TEXCOORD0)
 
 	if(Tonemappers >= 1)
    	Color = lerp(Luma(Color),Color,Saturate);
-
+	//if(FilmicBloom > 0)
+	//Color += Bloom * lerp(0,0.5,FilmicBloom);
 	// Do inital de-gamma of the game image to ensure we're operating in the correct colour range.
 	if( Gamma > 1. )
 		Color = pow(abs(Color),Gamma);
@@ -739,9 +861,11 @@ float4 HDROut(float2 texcoords : TEXCOORD0)
 		Color = iReinhard;
 	else if(Inv_Tonemappers == 3)
 		Color = iFast;
-
 	//Bloom should be applied before Tonemapping as otherwise all high ranges will be lost. Also can used as "resolve." But, I don't do this.
-	Color += lerp( 0.0, (( Bloom - 0 ) / ( BI_Brightness - 0)), saturate(NC));
+	Bloom_A = lerp( 0.0, (( Bloom - 0 ) / ( BI_Brightness_A - 0)), saturate(NC));
+	Bloom_B = lerp( 0.0, (( Bloom - 0 ) / ( BI_Brightness_B - 0)), saturate(NC));
+	Bloom = lerp(Bloom_A,Bloom_B,Final_Bloom( texcoords ).w);
+	Color += Bloom;
 
 	//Tone map all the things
 	//Using the optimized tonemapper by Jim Hejl and Richard Burgess-Dawson 0.148 for the GreyValue works for me. https://imgflip.com/i/oos2z But, I will alow for this to be adjusted.
@@ -772,16 +896,19 @@ float4 HDROut(float2 texcoords : TEXCOORD0)
 		Color = pow(abs(Color),rcp(2.2));
 	#endif
 
-
+	float2 D = Depth_Info(texcoords);
+	float MD = saturate(NFCD.x > 0 ? lerp(1, D.y > NFCD.y ,D.x) * 10 : D.y> NFCD.y);
 	if(Tonemappers >= 1)
 		Color = (Color - 0.5) * (Contrast) + 0.5;
 
 	if (Debug_View == 0)
 		Out = float4(Color, 1.);
 	else if(Debug_View == 1)
-		Out = float4(pow(( Bloom - 0 ) / ( BI_Brightness - 0),rcp(Gamma)), 1.);
-	else
+		Out = float4(pow(abs(( Bloom - 0 ) / ( BI_Brightness_A - 0)),rcp(Gamma)), 1.);
+	else if(Debug_View == 2)
 		Out = texcoords.y < 0.975 ? HeatMap(Luma( Color )): HeatMap(texcoords.x);
+	else
+		Out = lerp(D.y,float3(D.y,0.5,D.y),MD) ;
 
 	return float4(Out.rgb,1.0);
 }
@@ -907,7 +1034,7 @@ technique Blooming_HDR
     {
         VertexShader = PostProcessVS;
         PixelShader = PS_CurrentInfo;
-        RenderTarget = texCurrent;
+        RenderTarget0 = texCurrColor;
     }
 		pass MIP_Blur_HV_One
 	{

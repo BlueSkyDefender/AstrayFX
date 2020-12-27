@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 2.0
+//For Reshade 3.0+ PCGI Ver 2.1
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -127,6 +127,9 @@
 // So all in all this was capable of being done. The Thickness estimation may cause issues on White objects that trigger the Skin Detection so be warned.
 // This shader not done. But, it is close.
 //
+// Update 2.1
+// Small changes to help guide the user a bit more with SSLT.
+//
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #if exists "Overwatch.fxh"                                           //Overwatch Interceptor//
 	#include "Overwatch.fxh"
@@ -205,7 +208,8 @@ uniform int RadiantGI <
 			  		"As you can tell its name is a play on words and it radiates the kind of feeling I want from it one Ray Bounce at a time.\n"
 			  			  "This GI shader is free and shouldn't sit behind a paywall. If you paid for this shader ask for a refund right away.\n"
 			  			  		"As for my self I do want to provide the community with free shaders and any donations will help keep that motivation alive.\n"
-			  			  			  "For more information and help please feel free to visit http://www.Depth3D.info or https://blueskydefender.github.io/AstrayFX.\n "
+			  			  			  "For more information and help please feel free to visit http://www.Depth3D.info or https://blueskydefender.github.io/AstrayFX\n "
+			  			  			 	 "Help with this shader fuctions specifically visit the WIki @ https://github.com/BlueSkyDefender/AstrayFX/wiki/RadiantGI\n"									
 			  "Please enjoy this shader and Thank You for using RadiantGI.";
 	ui_category = "RadiantGI";
 	ui_category_closed = true;
@@ -302,16 +306,26 @@ uniform float Diffusion_Power <
 	ui_category = "SSLT";
 > = 0.5;
 
-#if LutSD
+#if LutSD //Man............................................
 uniform float2 SSS_Seek <
 #else
 uniform float SSS_Seek <
 #endif
 	ui_type = "slider";
 	ui_min = 0.0; ui_max = 1.0;
-	ui_label = "Skin Distance & Seeking";
-	ui_tooltip = "Lets you control how far we need to search and seek for human skin.\n"
+#if LutSD
+	ui_label = "Skin Detect Distance & Seeking";
+#else
+	ui_label = "Skin Detect Distance";
+#endif
+	ui_tooltip = "Lets you control how far we need to search and seek with the human skin tone detection algorithm for SSLT.\n"
+#if LutSD
 			     "Defaults are [0.25] and [0.5].";
+#else
+				 "The 2nd option only shows if you use the special LUT for custom and or more accurate skin tone detection.\n"
+				 "You can get this LUT @ https://github.com/BlueSkyDefender/AstrayFX/wiki/Subsurface-Light-Transport\n"
+			     "Default is [0.25].";
+#endif
 	ui_category = "SSLT";
 #if LutSD
 > = float2(0.25,0.5);
@@ -383,7 +397,7 @@ uniform float Saturation <
 
 uniform float GI_Fade < //Blame the pineapple for this option.
 	ui_type = "slider";
-	ui_min = 0.0; ui_max = 1.0;
+	ui_min = 0.0; ui_max = 1.0; //Still need to make this better......
 	ui_label = "Depth Fade";
 	ui_tooltip = "GI Application Power that is based on Depth scaling for controlled fade In-N-Out.\n" //That's What A Hamburger's All About
 			     "Can be set from 0 to 1 and is Set to Zero for No Culling.\n"
