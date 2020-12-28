@@ -81,7 +81,7 @@ uniform float Similarity <
 	#else
 	ui_type = "slider";
 	#endif
-	ui_min = 0.0; ui_max = 1.0;
+	ui_min = -1.0; ui_max = 1.0;
 	ui_label = "Depth Similarity";
 	ui_tooltip = "Extra Image clamping based on Depth Similarities between Past and Current Depth for DeGhosing TAA.\n"
 				 "Works on Depth & Color Delta is Selected and Depth is working in the game.\n"
@@ -104,7 +104,7 @@ uniform float Delta_Power <
 	ui_type = "slider";
 	#endif
 	ui_min = 0.0; ui_max = 1.0;
-	ui_label = "Depth Delta Power";
+	ui_label = "Color & Depth Delta Power";
 	ui_tooltip = "Extra Image clamping based on delta between Past and Current Depth Buffer.\n"
 				 "Only works on Depth Delta is Selected and Depth is working in the game.\n"
 				 "Default is 0.25.";
@@ -114,7 +114,7 @@ uniform float Delta_Power <
 //Depth Map//
 uniform int Debug <
 	ui_type = "combo";
-	ui_items = "TAA\0Delta Clamping Color\0Delta Clamping Depth\0Depth and DeGhosting Mask\0";
+	ui_items = "TAA\0Delta Clamping\0DeGhosting Mask\0Depth\0";
 	ui_label = "Debug View";
 > = 0;
 
@@ -255,9 +255,8 @@ float3 decodePalYuv(float3 ycc)
 }
 
 float4 TAA(float2 texcoord)
-{
-	//Depth Similarity
-	float M_Similarity = saturate(1-Similarity), D_Similarity = saturate(pow(abs(DepthM(texcoord).y/tex2D(PSDepthBuffer,texcoord).x), 100) + M_Similarity);
+{   //Depth Similarity
+	float M_Similarity = 1-abs(Similarity), D_Similarity = saturate(pow(abs(DepthM(texcoord).y/tex2D(PSDepthBuffer,texcoord).x), 100) + M_Similarity);
 	//Velocity Scaler
 	float S_Velocity = 12.5 * lerp( 1, 80,Delta_Power), V_Buffer = saturate(distance(DepthM(texcoord).y,tex2D(PSDepthBuffer,texcoord).x) * S_Velocity);
 	   
@@ -282,36 +281,30 @@ float4 TAA(float2 texcoord)
 		minColor = min(minColor,encodePalYuv(tex2Dlod(BackBuffer, float4(texcoord + XYoffset[i],0,0)).rgb)) - MB;
 		maxColor = max(maxColor,encodePalYuv(tex2Dlod(BackBuffer, float4(texcoord + XYoffset[i],0,0)).rgb)) + MB;
 	}
-	antialiased = encodePalYuv(antialiased);
-
-   float3 preclamping = antialiased;
-    antialiased = clamp(antialiased, minColor, maxColor);
+    antialiased = clamp(encodePalYuv(antialiased), minColor, maxColor);
 
     mixRate = rcp(1.0 / mixRate + 1.0);
 
-    float3 diff = antialiased - preclamping;
-
-    diff.x = dot(diff,diff) * 4.0;
+    float diff = length(BB - tex2D(PSBackBuffer, texcoord).xyz) * lerp(1.0,8.0,Delta_Power);
 	
 	if(Delta == 1)
-		diff.x == V_Buffer;
+		diff = V_Buffer;
 		
-    float clampAmount = diff.x;
+    float clampAmount = diff;
 
     mixRate += clampAmount;
     mixRate = clamp(mixRate, 0.05, 0.5);
 
     antialiased = decodePalYuv(antialiased);
 	//Need to check for DX9
-	float4 Output = float4(antialiased,mixRate);
-	Output = lerp(float4(BB,1),Output,D_Similarity);
+	float4 Output = Similarity > 0 ? lerp(float4(BB,1), float4(antialiased,mixRate), D_Similarity) : float4(lerp(BB,antialiased, D_Similarity),mixRate);
 	
 	if (Debug == 1)
-		Output = dot(diff,diff) * 4.0;
-	else if (Debug == 2)
-		Output = V_Buffer;
+		Output = diff;
+	else if (Debug == 2)	
+		Output = lerp(float3(1,0,0),Output.rgb, D_Similarity);
 	else if (Debug == 3)
-		Output = lerp(1,DepthM(texcoord).y, D_Similarity);
+		Output = DepthM(texcoord).y;
 		
     return Output;
 }
