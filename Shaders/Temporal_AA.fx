@@ -4,7 +4,7 @@
 
  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
  //* Temporal AA "Epic Games" implementation + Some Magic:
- //* For ReShade 3.0+
+ //* For ReShade 3.0+ v 1.1
  //*  ---------------------------------
  //*                                                                           TAA
  //* Due Diligence
@@ -73,12 +73,26 @@ uniform float Persistence <
 	ui_tooltip = "Increase persistence of the frames this is really the Temporal Part.\n"
 				 "Default is 0.25. But, a value around 0.05 is recommended.";
 	ui_category = "TAA";
+> = 0.125;
+
+uniform float Similarity <
+	#if Compatibility
+	ui_type = "drag";
+	#else
+	ui_type = "slider";
+	#endif
+	ui_min = 0.0; ui_max = 1.0;
+	ui_label = "Depth Similarity";
+	ui_tooltip = "Extra Image clamping based on Depth Similarities between Past and Current Depth for DeGhosing TAA.\n"
+				 "Works on Depth & Color Delta is Selected and Depth is working in the game.\n"
+				 "Default is 0.25.";
+	ui_category = "TAA";
 > = 0.25;
 
 uniform int Delta <
 	ui_type = "combo";
-	ui_label = "Use Delta Masking";
-	ui_items = "Off\0Color Delta\0Depth Delta\0";
+	ui_label = "Used Delta Masking";
+	ui_items = "Color Delta\0Depth Delta\0";
 	ui_label = "TAA";
 	ui_category = "TAA";
 > = 0;
@@ -89,19 +103,20 @@ uniform float Delta_Power <
 	#else
 	ui_type = "slider";
 	#endif
-	ui_min = -1.0; ui_max = 1.0;
-	ui_label = "Delta power";
-	ui_tooltip = "Extra Image clamping based on delta between.\n"
-				 "Default is 0.75.";
+	ui_min = 0.0; ui_max = 1.0;
+	ui_label = "Depth Delta Power";
+	ui_tooltip = "Extra Image clamping based on delta between Past and Current Depth Buffer.\n"
+				 "Only works on Depth Delta is Selected and Depth is working in the game.\n"
+				 "Default is 0.25.";
 	ui_category = "TAA";
-> = 0.75;
+> = 0.25;
 
 //Depth Map//
 uniform int Debug <
 	ui_type = "combo";
-	ui_items = "Off\0Delta Clamping\0Depth Masking Cutoff\0";
+	ui_items = "TAA\0Delta Clamping Color\0Delta Clamping Depth\0Depth and DeGhosting Mask\0";
 	ui_label = "Debug View";
-> = false;
+> = 0;
 
 uniform int Depth_Map <
 	ui_type = "combo";
@@ -240,7 +255,13 @@ float3 decodePalYuv(float3 ycc)
 }
 
 float4 TAA(float2 texcoord)
-{   float Per = 1-Persistence;
+{
+	//Depth Similarity
+	float M_Similarity = saturate(1-Similarity), D_Similarity = saturate(pow(abs(DepthM(texcoord).y/tex2D(PSDepthBuffer,texcoord).x), 100) + M_Similarity);
+	//Velocity Scaler
+	float S_Velocity = 12.5 * lerp( 1, 80,Delta_Power), V_Buffer = saturate(distance(DepthM(texcoord).y,tex2D(PSDepthBuffer,texcoord).x) * S_Velocity);
+	   
+	float Per = 1-Persistence;
     float4 PastColor = tex2Dlod(PBackBuffer,float4(texcoord,0,0) );//Past Back Buffer
 		   PastColor = (1-Per) * tex2D(BackBuffer, texcoord) + Per * PastColor;
 
@@ -254,10 +275,10 @@ float4 TAA(float2 texcoord)
 
 	const float2 XYoffset[8] = { float2( 0,+pix.y ), float2( 0,-pix.y), float2(+pix.x, 0), float2(-pix.x, 0), float2(-pix.x,-pix.y), float2(+pix.x,-pix.y), float2(-pix.x,+pix.y), float2(+pix.x,+pix.y) };
 
-	float3 minColor = encodePalYuv(tex2D(BackBuffer, texcoord + XYoffset[0] ).rgb) - MB;
-	float3 maxColor = encodePalYuv(tex2D(BackBuffer, texcoord + XYoffset[0] ).rgb) + MB;
+	float3 minColor = encodePalYuv(tex2D(BackBuffer, texcoord ).rgb) - MB;
+	float3 maxColor = encodePalYuv(tex2D(BackBuffer, texcoord ).rgb) + MB;
 	for(int i = 1; i < 8; ++i)
-	{ //DX9 work around.
+	{   //DX9 work around.
 		minColor = min(minColor,encodePalYuv(tex2Dlod(BackBuffer, float4(texcoord + XYoffset[i],0,0)).rgb)) - MB;
 		maxColor = max(maxColor,encodePalYuv(tex2Dlod(BackBuffer, float4(texcoord + XYoffset[i],0,0)).rgb)) + MB;
 	}
@@ -270,20 +291,28 @@ float4 TAA(float2 texcoord)
 
     float3 diff = antialiased - preclamping;
 
-    diff.x = dot(diff,diff);
-
+    diff.x = dot(diff,diff) * 4.0;
+	
+	if(Delta == 1)
+		diff.x == V_Buffer;
+		
     float clampAmount = diff.x;
 
-    mixRate += clampAmount * 4.0;
+    mixRate += clampAmount;
     mixRate = clamp(mixRate, 0.05, 0.5);
 
     antialiased = decodePalYuv(antialiased);
-
 	//Need to check for DX9
 	float4 Output = float4(antialiased,mixRate);
-    if(abs(Depth_CutOff) > 0)
-    	Output = lerp(float4(antialiased,mixRate), tex2D(BackBuffer, texcoord), Depth_CutOff < 0 ? 1-DepthM(texcoord).x : DepthM(texcoord).x);
-
+	Output = lerp(float4(BB,1),Output,D_Similarity);
+	
+	if (Debug == 1)
+		Output = dot(diff,diff) * 4.0;
+	else if (Debug == 2)
+		Output = V_Buffer;
+	else if (Debug == 3)
+		Output = lerp(1,DepthM(texcoord).y, D_Similarity);
+		
     return Output;
 }
 
@@ -291,28 +320,8 @@ void Out(float4 position : SV_Position, float2 texcoord : TEXCOORD, out float4 c
 {
 	float PosX = 0.9525f*BUFFER_WIDTH*pix.x,PosY = 0.975f*BUFFER_HEIGHT*pix.y, Scale = 2;
 	float3 D,E,P,T,H,Three,DD,Dot,I,N,F,O;
-	float4 Color, C = BB_H(texcoord), M = (tex2D(CBackBuffer,texcoord).rgba - tex2D(PSBackBuffer,texcoord).rgba), DM = abs(tex2D(CDepthBuffer,texcoord).x - tex2D(PSDepthBuffer,texcoord).x) * 100;
-	float Mask = 1;
 
-	float4 Per = tex2Dlod(PBackBuffer,float4(texcoord,0,0) );//Past Back Buffer
-
-	if(Delta)
-	{
-		Per *= 1-abs(Delta_Power);
-		Mask = max(saturate(length(Delta == 2 ? DM : M) * 50.0),length(Per));
-	}
-
-	Color = TAA(texcoord);
-
-	if(Debug == 1)
-	Color = float4(1,0,0,1);
-	if(Debug == 2)
-	{
-		Color = float4(1,0,0,1);
-		Mask = Depth_CutOff < 0 ? 1-DepthM(texcoord).x : DepthM(texcoord).x;
-	}
-
-  float4 T_A_A = Delta_Power < 0 ? lerp(Color,C,saturate(Mask)) : lerp(C,Color,saturate(Mask));
+	 float4 T_A_A = TAA(texcoord);
 
 	#if App_Sync
   if(texcoord.x < pix.x * Scale && 1-texcoord.y < pix.y * Scale)

@@ -82,16 +82,12 @@
 // 3 = Medium
 // 4 = High
 // Default is off.
-#define M_Quality 0 //Manualy set shader Quality. Defaults to 2 when set to off.
-
-//Zero is Fast, a ''Optimized'' Bilateral Filtering approach wink wink and One is a Acuurate. Acuurate is the correct way of doing Bilateral filtering.
-#define B_Accuracy 0 //Bilateral Accuracy
+#define M_Quality 0 //Manual Quality Shader Defaults to 2 when set to off.
 
 //Use this to enable motion Sharpen option also reduces perf a bit more
 #define Motion_Sharpen 0
 
 // It is best to run Smart Sharp after tonemapping.
-
 #if !defined(__RESHADE__) || __RESHADE__ < 40000
 	#define Compatibility 1
 #else
@@ -144,14 +140,20 @@ uniform float Sharpness <
 	ui_category = "Bilateral CAS";
 > = 0.625;
 
-uniform int B_Grounding <
-	ui_type = "combo";
-	ui_items = "Fine\0Medium\0Coarse\0";
-	ui_label = "Grounding Type";
-	ui_tooltip = "Like Coffee pick how rough do you want this shader to be.\n"
-				 "Let me have fun with names and tooltips.......";
+uniform float B_Grounding <
+	#if Compatibility
+	ui_type = "drag";
+	#else
+	ui_type = "slider";
+	#endif
+    ui_label = "Coarseness";
+    ui_min = 0.0; ui_max = 1.0;
+	ui_tooltip = "Like Coffee pick how rough do you want this shader to be, really just adjusts the radius of the filter.\n"
+				 "Fine -> Medium -> Coarse too what ever you think looks good.\n"
+				 "Let me have fun with names and tooltips........\n"
+				 "Number 0.0 is default.";
 	ui_category = "Bilateral CAS";
-> = 0;
+> = 0.0;
 
 uniform bool CAM_IOB <
 	ui_label = "CAM Ignore Overbright";
@@ -274,22 +276,22 @@ sampler BackBuffer
 		Texture = BackBufferTex;
 		SRGBTexture = true;
 	};
+
+texture Bi_HozTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA8;};
+
+sampler Bi_HozSampler
+	{
+		Texture = Bi_HozTex;
+	};	
+	
+texture Bi_VerTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA8;};
+
+sampler Bi_VerSampler
+	{
+		Texture = Bi_VerTex;
+	};	
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #if Motion_Sharpen
-texture CurrentBBSSTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA8;};
-
-sampler CBBSS
-	{
-		Texture = CurrentBBSSTex;
-	};
-
-texture PastBBSSTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA8;};
-
-sampler PBBSS
-	{
-		Texture = PastBBSSTex;
-	};
-
 texture DownSTex {Width = 256; Height = 256; Format = R8;  MipLevels = 9;};
 
 sampler DSM
@@ -349,15 +351,7 @@ float LI(float3 RGB)
 	return dot(RGB,float3(0.2126, 0.7152, 0.0722));
 }
 
-float GT()
-{
-if (B_Grounding == 2)
-	return 1.5;
-else if(B_Grounding == 1)
-	return 1.25;
-else
-	return 1.0;
-}
+float GT() { return lerp(1.0,2.5,B_Grounding);}
 
 float MotionSharpen(float2 texcoord)
 {
@@ -370,7 +364,7 @@ float MotionSharpen(float2 texcoord)
 		BlurMotion += tex2D(DSM,texcoord + float2(PS.x,0)).x;
 		BlurMotion += tex2D(DSM,texcoord + float2(-PS.x,0)).x;
 		BlurMotion += tex2D(DSM,texcoord + float2(0,-PS.y)).x;
-		return (BlurMotion * 0.2) * 12.5;
+		return (BlurMotion * 0.2) * 12.5; 
 	}
 	else
 		return tex2Dlod(DSM,float4(texcoord,0,11)).x * lerp(0.0,25.0,GMD);
@@ -379,10 +373,50 @@ float MotionSharpen(float2 texcoord)
 #endif
 }
 
+float3 Bilateral(sampler Tex,float2 texcoord, int Dir)
+{
+
+	//Bilateral Filter//                                                Q1         Q2       Q3        Q4
+	const int kSize = MSIZE * 0.5; // Default M-size is Quality 2 so [MSIZE 3] [MSIZE 5] [MSIZE 7] [MSIZE 9] / 2.
+
+	float3 final_colour, c = tex2Dlod(Tex, float4(texcoord,0,0)).rgb, cc;
+	float2 RPC_WS = pix * GT();
+	float bZ = rcp(normpdf(0.0, BSIGMA)), Z, factor;
+
+	float kernal[MSIZE];
+	[unroll]
+	for (int o = 0; o <= kSize; ++o)
+	{
+		kernal[kSize+o] = kernal[kSize-o] = normpdf(o, SIGMA);
+	}
+
+	[loop]
+	for (int i=-kSize; i <= kSize; ++i)
+	{
+			float2 D = Dir ? float2(i,0) * RPC_WS * rcp(kSize) : float2(0,i) * RPC_WS * rcp(kSize);
+			cc = tex2Dlod(Tex, float4(texcoord + D,0,0)).rgb;
+			factor = normpdf3(cc-c, BSIGMA) * bZ * kernal[kSize+i] * kernal[kSize+i];
+			Z += factor;
+			final_colour += factor * cc;
+	}
+	
+	return final_colour/Z;
+}
+
+float4 Bi_Hoz(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
+{   //Bilateral and Past
+	return float4(Bilateral(BackBuffer,texcoord, 1),tex2D(Bi_VerSampler,texcoord).w);
+}
+
+float4 Bi_Ver(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
+{   //Bilateral and Current
+	return float4(Bilateral(Bi_HozSampler,texcoord, 0),dot(tex2D(BackBuffer,texcoord),0.333));
+}
+
 float4 CAS(float2 texcoord)
 {
     float Up, Left, Center, Right, Down, mnRGB, mxRGB;
-
+    
 	// fetch a Cross neighborhood around the pixel 'C',
 	//         Up
 	//
@@ -390,51 +424,24 @@ float4 CAS(float2 texcoord)
 	//
 	//        Down
 	if(!CA_Removal)
-	{
+	{ 
 	    Up = LI(BB(texcoord, float2( 0,-pix.y)));
 	    Left = LI(BB(texcoord, float2(-pix.x, 0)));
 	    Center = LI(BB(texcoord, 0));
 	    Right = LI(BB(texcoord, float2( pix.x, 0)));
 		Down = LI(BB(texcoord, float2( 0, pix.y)));
-
+	
 	    mnRGB = Min3( Min3(Left, Center, Right), Up, Down);
 	    mxRGB = Max3( Max3(Left, Center, Right), Up, Down);
-	}
+	}    
     // Smooth minimum distance to signal limit divided by smooth max.
     float rcpMRGB = rcp(mxRGB), RGB_D = saturate(min(mnRGB, 1.0 - mxRGB) * rcpMRGB);
 
 	if( CAM_IOB )
 		RGB_D = saturate(min(mnRGB, 2.0 - mxRGB) * rcpMRGB);
 
-	//Bilateral Filter//                                                Q1         Q2       Q3        Q4
-	const int kSize = MSIZE * 0.5; // Default M-size is Quality 2 so [MSIZE 3] [MSIZE 5] [MSIZE 7] [MSIZE 9] / 2.
-
-	float3 final_colour, c = BB(texcoord.xy,0), cc;
-	float2 RPC_WS = pix * GT();
-	float bZ = rcp(normpdf(0.0, BSIGMA)), Z, factor;
-	#if B_Accuracy
-	float kernal[MSIZE];
-	[unroll]
-	for (int o = 0; o <= kSize; ++o)
-	{
-		kernal[kSize+o] = kernal[kSize-o] = normpdf(o, SIGMA);
-	}
-	#endif
-	[loop]
-	for (int i=-kSize; i <= kSize; ++i)
-	{
-			for (int j=-kSize; j <= kSize; ++j)
-			{
-				cc = BB(texcoord.xy, float2(i,j) * RPC_WS * rcp(kSize) );
-				#if B_Accuracy
-					factor = normpdf3(cc-c, BSIGMA) * bZ * kernal[kSize+j] * kernal[kSize+i];
-				#else
-					factor = normpdf3(cc-c, BSIGMA);
-				#endif
-				Z += factor;
-				final_colour += factor * cc;
-			}
-	}
+	//Bilateral Filter//
+	float3 BF = tex2Dlod(Bi_VerSampler, float4(texcoord,0,0)).rgb;
 
 	//// Shaping amount of sharpening masked
 	float CAS_Mask = RGB_D, Sharp = Sharpness, MD = MotionSharpen(texcoord);
@@ -448,7 +455,7 @@ float4 CAS(float2 texcoord)
 	if(CA_Removal)
 		CAS_Mask = 1;
 
-return saturate(float4(final_colour/Z,CAS_Mask));
+return saturate(float4(BF,CAS_Mask));
 }
 
 float4 Sharpen_Out(float2 texcoord)
@@ -457,7 +464,7 @@ float4 Sharpen_Out(float2 texcoord)
 
 	if(GMD > 0 || Local_Motion)
 		Sharp = Sharpness * lerp( 1,MDSM,saturate(MD));
-
+		
     float3 Done = tex2D(BackBuffer,texcoord).rgb;
     if(CA_Removal || Debug_View || Debug_View == 4 || F_DeNoise)
     {   //Noise reduction for pure Bilateral Sharp WIP
@@ -465,7 +472,7 @@ float4 Sharpen_Out(float2 texcoord)
     	Noise = min( Min3(Done.r,Done.g,Done.b) * 2 - 1,2-Max3(Done.r,Done.g,Done.b));
     	Done = lerp(CAS(texcoord).rgb,tex2D(BackBuffer,texcoord).rgb,saturate(Noise));
     }
-
+    
     if(Debug_View || Debug_View == 4)
 		return float4((Done - CAS(texcoord).rgb)*(Sharp*3.1),saturate(Noise)); //Sharpen Debug and Noise
 	else
@@ -491,7 +498,7 @@ float3 ShaderOut(float2 texcoord : TEXCOORD0)
 		Out.rgb = lerp(1.0,CAS(float2(texcoord.x,texcoord.y)).www,1-DB);
 	else if (Debug_View == 4)
 		Out.rgb = Sharpen_Out(texcoord).w;
-
+		
 	#if Motion_Sharpen
 	if (Debug_View >= 1)
 	{
@@ -503,18 +510,8 @@ float3 ShaderOut(float2 texcoord : TEXCOORD0)
 	return Out;
 }
 #if Motion_Sharpen
-float CBackBuffer_SS(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
-{
-	return dot(tex2D(BackBuffer,texcoord),0.333);
-}
-
-float PBackBuffer_SS(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
-{
-	return tex2D(CBBSS,texcoord).x;
-}
-
-float2 DownSampleMotion(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
-{	float Motion = abs(tex2D(CBBSS,texcoord).x - tex2D(PBBSS,texcoord).x);
+float DownSampleMotion(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
+{	float Motion = abs(tex2D(Bi_VerSampler,texcoord).w - tex2D(Bi_HozSampler,texcoord).w);
 	return Motion;
 }
 #endif
@@ -641,19 +638,19 @@ technique Smart_Sharp
 < ui_tooltip = "Suggestion : You Can Enable 'Performance Mode Checkbox,' in the lower bottom right of the ReShade's Main UI.\n"
 			   "             Do this once you set your Smart Sharp settings of course."; >
 {
+			pass BilateralHoz //Done this way to keep Freestyle comp.
+		{
+			VertexShader = PostProcessVS;
+			PixelShader = Bi_Hoz;
+			RenderTarget = Bi_HozTex;
+		}
+			pass BilateralVer
+		{
+			VertexShader = PostProcessVS;
+			PixelShader = Bi_Ver;
+			RenderTarget = Bi_VerTex;
+		}	
 		#if Motion_Sharpen // Motion Sharpen makes this shader slower.
-			pass PBB //Done this way to keep Freestyle comp.
-		{
-			VertexShader = PostProcessVS;
-			PixelShader = PBackBuffer_SS;
-			RenderTarget = PastBBSSTex;
-		}
-			pass CBB
-		{
-			VertexShader = PostProcessVS;
-			PixelShader = CBackBuffer_SS;
-			RenderTarget = CurrentBBSSTex;
-		}
 			pass Down_Sample_Motion
 		{
 			VertexShader = PostProcessVS;
