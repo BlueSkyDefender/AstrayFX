@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 2.2
+//For Reshade 3.0+ PCGI Ver 2.3
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -134,6 +134,9 @@
 // More Pooled Texture issues. Black screen is shown when Pooling some textures. Issue now is that this shader uses around 605.0 MiB at 4k...... 
 // Need to talk to the main man about this. When time allows.
 // 
+// Update 2.3
+// Added a way to control the Subsurface Scattering Brightness.
+//
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #if exists "Overwatch.fxh"                                           //Overwatch Interceptor//
 	#include "Overwatch.fxh"
@@ -165,9 +168,6 @@
 #define Denoiser_Power 2//[0 Low |1 Normal|2 High]  Use this if the Noise that is generated on Foliage/Edges is too much for you. A pineapple said. It can affect performance.
 #define RL_Alternation 0      //[Off | On]          Used for enabling Ray Length Alternation Mode. This lets the ray size alternate every frame at 75% of current length.
 #define TAA_Clamping 0.2      //[0.0 - 1.0]         Use this to adjust TAA clamping.
-
-//Subsurface Scattering
-#define SSS_Extra_Settings 0  //[Off | On]          Use Setup SSS Luma your self.
 
 //Other Settings
 #define MaxDepth_Cutoff 0.999 //[0.1 - 1.0]         Used to cutout the sky with depth buffer masking. This lets the shader save on performance by limiting what is used in GI.
@@ -281,6 +281,16 @@ uniform float Wrap <
 	ui_category = "SSLT";
 > = 0.5;
 
+uniform float User_SSS_Luma <
+	ui_type = "slider";
+	ui_min = 0.0; ui_max = 1.0;
+	ui_label = "Subsurface Brightness";
+	ui_tooltip = "This is used to fine tune the automatic brightness of the upper layer scattering.\n"
+			     "Can be set from Zero to One.\n"
+			     "Default is [0.5].";
+	ui_category = "SSLT";
+> = 0.5;
+
 uniform float Deep_Scattering <
 	ui_type = "slider";
 	ui_min = 0.0; ui_max = 1.0;
@@ -336,26 +346,7 @@ uniform float SSS_Seek <
 #else
 > = 0.25;
 #endif
-#if SSS_Extra_Settings
-uniform bool Auto_SSS_Luma<
-	ui_label = "Auto Upper Scattering Brightness";
-	ui_tooltip = "Disable or Enable Auto Upper Scattering Brightness";
-	ui_category = "SSLT";
-> = true;
 
-uniform float User_SSS_Luma <
-	ui_type = "slider";
-	ui_min = 0.0; ui_max = 2.0;
-	ui_label = "Manual Upper Scattering Brightness";
-	ui_tooltip = "Upper Scattering Brightnes.\n"
-			     "Can be set from 0 to 1 and is in the order of Near Depth and Far Depth.\n"
-			     "Defaults are [Far 1.0].";
-	ui_category = "SSLT";
-> = 1.0;
-#else
-static const  int Auto_SSS_Luma = true;
-static const  float User_SSS_Luma = 1.0;
-#endif
 #if Controlled_Blend
 uniform float Blend <
 	ui_type = "slider";
@@ -1119,7 +1110,8 @@ float4 PCGI(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Targ
 float4 GI_Adjusted(float2 TC, int Mip)
 {
 	float4 Convert = tex2Dlod( PCGI_Info, float4( TC, 0, Mip));
-	float DT = BBColor(TC, 3.5 ).w * 5, SSL = Auto_SSS_Luma ? clamp(dot(BBColor(TC, 2).rgb,0.333) * 2.5,1,2) : min( User_SSS_Luma, 2);
+	float DT = BBColor(TC, 3.5 ).w * 5, SSL = clamp(dot(BBColor(TC, 2.0).rgb,0.333) * lerp(1.0,4.0,User_SSS_Luma),1,2);
+
 	Convert.x *= GPattern( TC).x ? GI_LumaPower : 1;
 	Convert.xyz = YCbCrtoRGB( Convert.xyz);
 	float3 SSS = InternalFleshColor(Convert.xyz * SSL, Convert.w , lerp(0,25,saturate(Internals.xyz)), DT );

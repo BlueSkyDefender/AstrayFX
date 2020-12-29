@@ -58,14 +58,23 @@ uniform bool Auto_Flare_Intensity <
     ui_category = "Flare Adjustments";
 > = false;
 
-uniform float Flare_Clamp <
+uniform float Flare_Clamp_A <
 	ui_type = "slider";
-	ui_min = 0.9; ui_max = 1.0; ui_step = 0.001;
-	ui_label = "Flare Clamp";
+	ui_min = 0.0; ui_max = 1.0;
+	ui_label = "Flare Brightness Threshold";
 	ui_tooltip = "Use this to set the color based brightness threshold for what is and what isn't allowed.\n"
-				 "Number 0.999 is default.";
+				 "Number 1.0 is default.";
 	ui_category = "Flare Adjustments";
-> = 0.999;
+> = 1.0;
+
+uniform float Flare_Clamp_B <
+	ui_type = "slider";
+	ui_min = 0.0; ui_max = 1.0;
+	ui_label = "Flare Max Brightness Cutoff";
+	ui_tooltip = "Use this to set the max cutoff point of the brightness things in the image.\n"
+				 "Number 1.0 is default.";
+	ui_category = "Flare Adjustments";
+> = 1.0;
 
 uniform float Flare_Spread <
 	ui_type = "slider";
@@ -96,21 +105,21 @@ uniform float Flare_Saturation <
 //User_Flare_Color needs Flare_Color_Map to be set to -1 and the rest uncommented.
 uniform int Flare_Color_Map <
 	ui_type = "slider";
-	ui_min = 0; ui_max = 8;
+	ui_min = -1; ui_max = 8;
 	ui_label = "Flare Color Map";
 	ui_tooltip = "Use this to set MIP levels for the color map used to se Flare Color.\n"
 				 "This samples color in the general area to achieve this effect.\n"
 								"Number 4 is default & Zero is Off.";
 	ui_category = "Flare Adjustments";
 > = 4;
-//This did not make the cut.
-//uniform float3 User_Flare_Color <
-//	ui_type = "color";
-//	ui_min = 0.0; ui_max = 1.0;
-//	ui_label = "Flare Color Adjust";
-//	ui_tooltip = "Use this to set your own color settings.";
-//	ui_category = "Flare Adjustments";
-//> = float3(1.0,1.0,1.0);
+
+uniform float3 User_Flare_Color <
+	ui_type = "color";
+	ui_min = 0.0; ui_max = 1.0;
+	ui_label = "Flare Color Adjust";
+	ui_tooltip = "Use this to set your own color settings.";
+	ui_category = "Flare Adjustments";
+> = float3(1.0,1.0,1.0);
 
 uniform float Flare_Localization <
 	ui_type = "slider";
@@ -174,7 +183,7 @@ uniform bool Flair_Falloff <
 	ui_category = "Depth Map Masking";
 > = false;
 
-#if __RENDERER__ >= 0x10000 || __RENDERER__ >= 0x20000
+#if __RENDERER__ >= 0x20000 //Vulkan
 	#define Rend 1
 #else
 	#define Rend 0
@@ -334,7 +343,7 @@ void ColorBB(float4 position : SV_Position, float2 texcoord : TEXCOORD, out floa
     MBB = BB( texcoord ).rgb;
 }
 
-float3 GBightColors( float2 texcoord )
+float4 GBightColors( float2 texcoord )
 { float DM = smoothstep(0,1,DepthMap(texcoord).x);
 	//Forced Depth Masking
 	if(DM == 1)
@@ -348,14 +357,15 @@ float3 GBightColors( float2 texcoord )
 	float4 CM = lerp(tex2Dlod(SamplerMBB,float4(texcoord,0,clamp(Flare_Color_Map,0,8))).rgba,0,DM);
 	float4 BC = lerp(BB(texcoord),0,DM);
     // Check whether fragment output is higher than threshold,if so output as brightness color.
-    BC.a = lum(BC.rgb);//Intensity
-    BC.a = BC.a > Flare_Clamp ? 1 : 0;
-    BC.rgb *= BC.a;
+	float I_A = lum(BC.rgb), I_B = 1-I_A;   
+	I_A *= I_B >= 1-Flare_Clamp_B;//Trim from Top
+    BC.a = I_A > lerp(0.9,0.999,Flare_Clamp_A);// ? 1 : 0;
+    BC.rgb *= BC.a ;
 
 	if(Flare_Color_Map > 0)
 		BC.rgb = CM.rgb * BC.a;
-	//else if(Flare_Color_Map == -1)
-  //  	BC.rgb *= User_Flare_Color;
+	else if(Flare_Color_Map == -1)
+    	BC.rgb *= User_Flare_Color;
 
 	if(Flair_Falloff)
     	BC.rgb = lerp(BC.rgb,0.0,DepthMap(texcoord).y);
@@ -382,14 +392,14 @@ float3 GBightColors( float2 texcoord )
 
 		BC.rgb = lerp(BC.rgb,0.0,vignette);
 	}
-   return saturate(BC.rgb);
+   return float4(saturate(BC.rgb),BC.a);
 }
 
 void StoredBB(float4 position : SV_Position, float2 texcoord : TEXCOORD, out float3 BC : SV_Target)
 {
     BC = GBightColors( texcoord ).rgb;
 }
-#if Rend
+#if !Rend
 //Done this way to reduce TempRegisters for DX9 compatablity.
 float3 Glammor(sampler2D Sample, float2 texcoord, float N, int Switch, float BBS)
 {
