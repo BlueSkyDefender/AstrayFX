@@ -98,14 +98,6 @@
 #else
 	#define Compatibility 0
 #endif
-uniform float2 TEST <
-	#if Compatibility
-	ui_type = "drag";
-	#else
-	ui_type = "slider";
-	#endif
-	ui_min = -1.0; ui_max = 1.0;
-> = float2(0,1);
 
 uniform int Depth_Map <
 	ui_type = "combo";
@@ -483,7 +475,7 @@ float4 Sharpen_Out(float2 texcoord)
  //   	Done = lerp(CAS(texcoord).rgb,tex2D(BackBuffer,texcoord).rgb,saturate(Noise));
  //   }
     Sharpen_Power *= 3.1;
-	float3 Sharpen = (Done - CAS(texcoord).rgb) * Sharpen_Power;
+	float3 Sharpen = Sharpness >= 0 ? (Done - CAS(texcoord).rgb) * Sharpen_Power : ((Done - CAS(texcoord).rgb) * abs(Sharpen_Power) + 0.5) * 2;
 	
 	if (ClampSharp)
 	Sharpen = saturate(Sharpen);//will add a way to clamp it.
@@ -491,16 +483,21 @@ float4 Sharpen_Out(float2 texcoord)
 	float Grayscale_Sharpen = dot(Sharpen, 0.333);
 	
 	if (Output_Selection == 0)
-		Sharpen = lerp(Grayscale_Sharpen,Sharpen,0.5) + Done;
+		Sharpen = lerp(Grayscale_Sharpen,Sharpen,0.5);
 	else if (Output_Selection == 1)
-		Sharpen = Sharpen + Done;
+		Sharpen = Sharpen;
 	else
-		Sharpen = Grayscale_Sharpen + Done;
+		Sharpen = Grayscale_Sharpen;
 	
+	if(Sharpness >= 0 )
+		Sharpen += Done;
+	else 
+		Sharpen *= Done;
+		
     if(Debug_View || Debug_View == 4)
-		return float4(Sharpen - Done,saturate(Noise)); //Sharpen Debug and Noise
+		return float4(Sharpness >= 0 ? Sharpen - Done : (Sharpen / Done) - 1.0,saturate(Noise)); //Sharpen Debug and Noise
 	else
-		return float4(lerp(Done,Sharpen, CAS(texcoord).w * saturate(Sharpen_Power)),1.0); //Sharpen Out
+		return float4(lerp(Done,Sharpen, CAS(texcoord).w * saturate(abs(Sharpen_Power))),1.0); //Sharpen Out
 }
 
 
