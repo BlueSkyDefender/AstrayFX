@@ -137,6 +137,9 @@
 // Update 2.3
 // Added a way to control the Subsurface Scattering Brightness.
 //
+// Update 2.4
+// Added a way to control Diffusion profile for added Reflectivness. Notices a bad bug with TAA not working in some game I need to find out why.
+//
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #if exists "Overwatch.fxh"                                           //Overwatch Interceptor//
 	#include "Overwatch.fxh"
@@ -166,7 +169,6 @@
 
 //TAA Quality Level
 #define Denoiser_Power 2//[0 Low |1 Normal|2 High]  Use this if the Noise that is generated on Foliage/Edges is too much for you. A pineapple said. It can affect performance.
-#define RL_Alternation 0      //[Off | On]          Used for enabling Ray Length Alternation Mode. This lets the ray size alternate every frame at 75% of current length.
 #define TAA_Clamping 0.2      //[0.0 - 1.0]         Use this to adjust TAA clamping.
 
 //Other Settings
@@ -220,10 +222,18 @@ uniform int RadiantGI <
 	ui_label = " ";
 	ui_type = "radio";
 >;
-
+/*
+uniform bool TAA_Toggle <
+	ui_label = "Toggle TAA";
+	ui_tooltip = "Use this to turn TAA Off and On, If Checked it's TAA OFF.";
+ui_category = "TAA";
+> = true;
+*/
+static const int TAA_Toggle = 0;
+	
 uniform float samples <
 	ui_type = "slider";
-	ui_min = 2; ui_max = 12; ui_step = 1;
+	ui_min = 2; ui_max = 11; ui_step = 1;
 	ui_label = "Samples";
 	ui_tooltip = "GI Sample Quantity is used to increase samples amount as a side effect this reduces noise.";
 	ui_category = "PCGI";
@@ -256,6 +266,16 @@ uniform float2 NCD <
 			     "Defaults are [Near Details X 0.125] [Weapon Hand Y 0.0]";
 	ui_category = "PCGI";
 > = float2(0.125,0.0);
+
+uniform float Reflectivness <
+	ui_type = "slider";
+	ui_min = 0.0; ui_max = 1.0;
+	ui_label = "Diffusion Amount";
+	ui_tooltip = "This basicly adds control for how defused the lighting should be AKA Reflectivness.\n"
+			     "Default is [0.0] and One is Max Diffusion.";
+	ui_category = "PCGI";
+> = 0.0;
+
 uniform float Trim <
 	ui_type = "slider";
 	ui_min = 0.0; ui_max = 2.5;
@@ -313,7 +333,7 @@ uniform float4 Internals < // We are all pink and fleshy on the inside?
 uniform float Diffusion_Power <
 	ui_type = "slider";
 	ui_min = 0.0; ui_max = 1.0;
-	ui_label = "Subsurface Diffusion Blur";
+	ui_label = "Subsurface Blur";
 	ui_tooltip = "Diffusion Blur is used too softens the lighting and makes the person a little more realistic by mimicking this effect skin has on light.\n"
 			     "Simulate light diffusion favor red blurring over other colors.\n"
 			     "Default is [0.5].";
@@ -600,10 +620,10 @@ void MCNoise(inout float Noise, float FC ,float2 TC,float seed)
 }
 
 float2 Rotate2D_A( float2 r, float l )
-{   float Reflectivness = 0.625;
+{   float Reflective_Diffusion = lerp(0.5,1.0,Reflectivness);
 	float2 Directions;
 	sincos(l,Directions[0],Directions[1]);//same as float2(cos(l),sin(l))
-	return float2( dot( r * Reflectivness, float2(Directions[1], -Directions[0]) ), dot( r, Directions.xy ) );
+	return float2( dot( r * Reflective_Diffusion, float2(Directions[1], -Directions[0]) ), dot( r, Directions.xy ) );
 }
 
 float2 Rotate2D_B( float2 r, float l )
@@ -815,7 +835,7 @@ sampler2D PCGIpastFrame { Texture = PCGIpastTex;
 	MipFilter = POINT;
 };
 
-texture2D PCGIaccuTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; };
+texture2D PCGIaccuTex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
 sampler2D PCGIaccuFrames { Texture = PCGIaccuTex; };
 //Seen issues whe pooling this texture...... Seems to be  ReShade bug that show when Pooling The textures on this one here.
 texture2D PCGIcurrColorTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;};
@@ -1166,20 +1186,20 @@ float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Targe
 	float3 GISamples, CurrAOGI = GI( texcoords, 0).rgb;
 
 	float3 antialiased = PastColor.xyz;
-	float mixRate = min( PastColor.w, 0.5);
+	float mixRate = min( PastColor.w, 0.5), MB = 0.0;
 
 	antialiased = lerp( antialiased * antialiased, CurrAOGI.rgb * CurrAOGI.rgb, mixRate);
 	antialiased = sqrt( antialiased);
 
-	float3 minColor = CurrAOGI;
-	float3 maxColor = CurrAOGI;
+	float3 minColor = CurrAOGI - MB;
+	float3 maxColor = CurrAOGI + MB;
 	[unroll]
 	for(int i = 0; i < 8; ++i)
 	{
 		float2 Offset = XYoffset[i] * (RSRes + 4);
 		GISamples = GI( texcoords + Offset , 0 ).rgb;
-		minColor = min( minColor, GISamples);
-		maxColor = max( maxColor, GISamples);
+		minColor = min( minColor, GISamples) - MB;
+		maxColor = max( maxColor, GISamples) + MB;
 	}
 	//Min Max neighbourhood clamping.
 	antialiased = clamp( antialiased, minColor, maxColor);
@@ -1192,14 +1212,14 @@ float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Targe
 	mixRate = clamp( mixRate, 0.05, 0.5);
 	//Sample from Accumulation buffer, with mix rate clamping.
 	float3 AA = lerp( 0, antialiased, D_Similarity);
-	return float4( AA, mixRate);
+	return float4( AA, TAA_Toggle ? 1.0 : mixRate);
 }
 //Box Blur Denoiser
 float4 Denoise(sampler Tex, float2 texcoords, float SXY, int Dir , float R )
 {
 	float4 StoredNormals_Depth = tex2Dlod( PCGIcurrNormalsDepth,float4( texcoords, 0, 0));
-	float4 center = tex2D(Tex,texcoords), color = 0.0; //     \/      I lie!!!!!! Because I love you..      \/
-	float total = 0.0, NormalBlurFactor = Debug == 1 ? 0.950f : 0.5f, DepthBlurFactor = Debug == 1 ? 0.001f : 0.01f,  DM = smoothstep(0,1,StoredNormals_Depth.w) > MaxDepth_Cutoff;
+	float4 center = tex2D(Tex,texcoords), color = 0.0;
+	float total = 0.0, NormalBlurFactor = 0.5f, DepthBlurFactor = 0.01f,  DM = smoothstep(0,1,StoredNormals_Depth.w) > MaxDepth_Cutoff;
 	if(!DM)
 	{
 		for (float i = -SXY; i <= SXY; i += 1.0)
@@ -1665,7 +1685,7 @@ ui_tooltip = "Alpha: Disk-to-Disk Global Illumination Primary Generator.¹"; >
 	{
 		VertexShader = PostProcessVS;
 		PixelShader = PreviousFrames;
-		RenderTarget0 = PCGIpastTex;
+		RenderTarget = PCGIpastTex;
 	}
 		pass CopyFrame
 	{
@@ -1696,7 +1716,7 @@ ui_tooltip = "Alpha: Disk-to-Disk Global Illumination Primary Generator.¹"; >
 	{
 		VertexShader = PostProcessVS;
 		PixelShader = AccumulatedFramesGI;
-		RenderTarget0 = PCGIaccuTex;
+		RenderTarget = PCGIaccuTex;
 	}
 }
 
