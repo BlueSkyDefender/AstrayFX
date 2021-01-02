@@ -39,10 +39,9 @@
  //* Jose Negrete AKA BlueSkyDefender
  //*
  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 uniform int AA_Adjust <
 	ui_type = "drag";
-	ui_min = 1; ui_max = 32;
+	ui_min = 1; ui_max = 128;
 	ui_label = "AA Power";
 	ui_tooltip = "Use this to adjust the AA power.\n"
 				 "Default is 16";
@@ -51,7 +50,7 @@ uniform int AA_Adjust <
 
 uniform float Mask_Adjust <
 	ui_type = "drag";
-	ui_min = 0.0; ui_max = 1.0;
+	ui_min = 0.0; ui_max = 4.0;
 	ui_label = "Mask Adjustment";
 	ui_tooltip = "Use this to adjust the Mask.\n"
 				 "Default is 1.00";
@@ -66,7 +65,7 @@ uniform int View_Mode <
 				 "NFAA Masked gives you a sharper image with applyed Normals AA.\n"
 				 "Masked View gives you a view of the edge detection.\n"
 				 "Normals gives you an view of the normals created.\n"
-				 "DLSS is NV_AI_DLSS Parody experiance.\n"
+				 "DLSS is NV_AI_DLSS Parody experiance..........\n"
 				 "Default is NFAA.";
 	ui_category = "NFAA";
 > = 0;
@@ -123,21 +122,21 @@ float4 GetBB(float2 texcoord : TEXCOORD)
 }
 
 float4 NFAA(float2 texcoord)
-{	float t, l, r, d, MA = Mask_Adjust;
-  if(View_Mode == 3)
-    MA = 5;
+{	float t, l, r, s, MA = Mask_Adjust;
+  if(View_Mode == 3 )
+    MA = 5.0;
 	float2 UV = texcoord.xy, SW = pix * MA, n; // But, I don't think it's really needed.
 	float4 NFAA; // The Edge Seeking code can be adjusted to look for longer edges.
 	// Find Edges
 	t = LI(GetBB( float2( UV.x , UV.y - SW.y ) ).rgb);
-	d = LI(GetBB( float2( UV.x , UV.y + SW.y ) ).rgb);
+	s = LI(GetBB( float2( UV.x , UV.y + SW.y ) ).rgb);
 	l = LI(GetBB( float2( UV.x - SW.x , UV.y ) ).rgb);
 	r = LI(GetBB( float2( UV.x + SW.x , UV.y ) ).rgb);
-  n = float2(t - d,-(r - l));
+    n = float2(t - s,-(r - l));
 	// I should have made rep adjustable. But, I didn't see the need.
 	// Since my goal was to make this AA fast cheap and simple.
   float nl = length(n), Rep = rcp(AA_Adjust);
-	if(View_Mode == 3)
+	if(View_Mode == 3 || View_Mode == 4)
 		Rep = rcp(128);
 	// Seek aliasing and apply AA. Think of this as basically blur control.
     if (nl < Rep)
@@ -146,7 +145,7 @@ float4 NFAA(float2 texcoord)
     }
     else
     {
-		  n *= pix / nl;
+		  n *= pix / (nl * (View_Mode == 3 ? 0.5 : 1.0));
 
 	float4   o = GetBB( UV ),
 			t0 = GetBB( UV + float2(n.x, -n.y)  * 0.5) * 0.9,
@@ -176,7 +175,7 @@ float4 NFAA(float2 texcoord)
 	}
 	else if (View_Mode == 2)
 	{
-		NFAA = float3(-float2(-(r - l),-(t - d)) * 0.5 + 0.5,1);
+		NFAA = float3(-float2(-(r - l),-(t - s)) * 0.5 + 0.5,1);
 	}
 
 return NFAA;
