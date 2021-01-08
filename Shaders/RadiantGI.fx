@@ -144,7 +144,10 @@
 // Changed the way I am doing my 2nd Denoiser. Also reworked the Saturation system and the HDR extraction.
 // Targeted lighting works as intended now. Indirect and Direct world color sampling. 
 // RadiantGI now has a pure GI mode that runs 2x times as slow but, gives 2x times more control.
-// This mode disables SSLT. So keep that in mind. 
+// This mode disables SSLT. So keep that in mind.
+//
+// Update 2.6
+// Added a way to force pooling off for 4.9.0+ and small perf boost. 
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #if exists "Overwatch.fxh"                                           //Overwatch Interceptor//
@@ -184,6 +187,7 @@
 #define Text_Info_Key 122     //F11 Key             Text Information Key Default 122 is the F11 Key. You can use this site https://keycode.info to pick your own.
 #define Disable_Debug_Info 0  //[Off | On]          Use this to disable help information that gives you hints for fixing many games with Overwatch.fxh.
 #define Minimize_Web_Info 0   //[Off | On]          Use this to minimize the website logo on startup.
+#define ForcePool 0           //[Off | On]          Force Pooled Textures in versions 4.9.0+ If you get a black screen turn this too off. Seems to be a ReShade Issue.
 
 //RadiantGI Extended          //Still WIP!!!
 #ifndef PureGI_Mode
@@ -213,10 +217,10 @@ static const float ig = 1.0;                 //LUT Gamma Adjustment 0.05 - 10.0
 //Use for real HDR. //Do not Use.
 #define HDR_Toggle 0 //For HDR //Do not Use.
 //Pooled Texture Issue for 4.8.0
-#if __RESHADE__ >= 40900
-	#define PoolTex true
+#if __RESHADE__ >= 40900 && ForcePool
+	#define PoolTex < pooled = true; >
 #else
-	#define PoolTex false
+	#define PoolTex
 #endif
 //ReVeil Intragration
 #if exists "ReVeil.fx"
@@ -628,7 +632,7 @@ float2 GIRL()
 		return  float2(GI_Ray_Length,250);
 	#endif
 }
-static const float EvenSteven[17] = { 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20 , 22, 24, 26, 28, 30, 32};
+static const float EvenSteven[20] = { 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20 , 22, 24, 26, 28, 30, 32, 34, 36, 38}; // It's not odd...
 /////////////////////////////////////////////////////D3D Starts Here/////////////////////////////////////////////////////////////////
 static const float2 XYoffset[8] = { float2( 0,+pix.y ), float2( 0,-pix.y), float2(+pix.x, 0), float2(-pix.x, 0), float2(-pix.x,-pix.y), float2(+pix.x,-pix.y), float2(-pix.x,+pix.y), float2(+pix.x,+pix.y) };
 static const float DBoffsets[7] = { -5.5, -3.5, -1.5, 0.0, 1.5, 3.5, 5.5 };
@@ -913,11 +917,11 @@ sampler2D PCGIpastFrame { Texture = PCGIpastTex;
 
 texture2D PCGIaccuTex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
 sampler2D PCGIaccuFrames { Texture = PCGIaccuTex; };
-//Seen issues whe pooling this texture.. Workaround for 4.8.0 
-texture2D PCGIcurrColorTex < pooled = PoolTex; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;};
+//Seen issues with pooling this texture.. Workaround for 4.8.0- 
+texture2D PCGIcurrColorTex PoolTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;};
 sampler2D PCGIcurrColor { Texture = PCGIcurrColorTex; };
 
-texture2D PCGIcurrNormalsDepthTex < pooled = true; >{ Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;};
+texture2D PCGIcurrNormalsDepthTex < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;};
 sampler2D PCGIcurrNormalsDepth { Texture = PCGIcurrNormalsDepthTex; };
 
 texture2D RadiantGITex  { Width = BUFFER_WIDTH * RSRes ; Height = BUFFER_HEIGHT * RSRes ; Format = RGBA16f; };//For AO this need to be RGBA16f or RGBA8
@@ -932,11 +936,11 @@ sampler2D PCGIupsample_Info { Texture = PCGIupsampleTex; };
 
 texture2D PCGIbackbufferTex < pooled = true; > { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f;  };
 sampler2D PCGIbackbuffer_Info { Texture = PCGIbackbufferTex; };
-//Seen issues whe pooling this texture.. Workaround for 4.8.0 
-texture2D PCGIHorizontalTex < pooled = PoolTex; > { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
+//Seen issues with pooling this texture.. Workaround for 4.8.0- 
+texture2D PCGIHorizontalTex PoolTex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
 sampler2D PCGI_BGUHorizontal_Sample { Texture = PCGIHorizontalTex;};
-
-texture2D PCGIVerticalTex < pooled = PoolTex; > { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
+//Seen issues with pooling this texture.. Workaround for 4.8.0- 
+texture2D PCGIVerticalTex PoolTex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
 sampler2D PCGI_BGUVertical_Sample { Texture = PCGIVerticalTex;
 };
 
@@ -1287,13 +1291,9 @@ void Upsample(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4
 
 float3 GI(float2 TC, float Mips)
 {
-	float3 Noise;
-	MCNoise( Noise.x, framecount, TC, 1 );
-	MCNoise( Noise.y, framecount, TC, 2 );
-	MCNoise( Noise.z, framecount, TC, 3 );
 	#line 1337 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info¿½ï¿½ï¿½"
 	#warning ""
-	return tex2Dlod( PCGIupsample_Info, float4( TC, 0, Mips)).xyz * Noise;
+	return tex2Dlod( PCGIupsample_Info, float4( TC, 0, Mips)).xyz * 0.5;
 }
 
 float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
@@ -1321,10 +1321,12 @@ float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Targe
 		minColor = min( minColor, GISamples) - MB;
 		maxColor = max( maxColor, GISamples) + MB;
 	}
+	//float3 preclamping = antialiased;
 	//Min Max neighbourhood clamping.
 	antialiased = clamp( antialiased, minColor, maxColor);
-
 	mixRate = rcp( 1.0 / mixRate + 1.0);
+    //float3 diff = antialiased - preclamping;
+    //diff.x = dot(diff,diff) * 4;
 	//Added Velocity Clamping.......
 	float clampAmount = V_Buffer;
 
