@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 2.3
+//For Reshade 3.0+ PCGI Ver 2.7
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -149,6 +149,15 @@
 // Update 2.6
 // Added a way to force pooling off for 4.9.0+ and small perf boost. 
 //
+// Update 2.7
+//
+// Improved Normal smoothing on my 2nd Denoiser and looser setting on my TAA solution should get most of the noise in motion.
+// Tested an Edge-Avoiding À-Trous Wavelet Transform Denoiser that was  "Fast." But, My own solution was faster and got rid of more noise.
+// All I can say is that I learned a lot about 2nd level Denoisers. I think I will be ready to may my own AO shader now.
+// For now enjoy this update.
+//
+// TLDR: Better Normal smoothing and noise removal in motion.
+//
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #if exists "Overwatch.fxh"                                           //Overwatch Interceptor//
 	#include "Overwatch.fxh"
@@ -177,7 +186,6 @@
 #define BD_Correction 0        //[Off | On]         Barrel Distortion Correction for non conforming BackBuffer.
 
 //TAA Quality Level
-#define Denoiser_Power 2//[0 Low |1 Normal|2 High]  Use this if the Noise that is generated on Foliage/Edges is too much for you. A pineapple said. It can affect performance.
 #define TAA_Clamping 0.2      //[0.0 - 1.0]         Use this to adjust TAA clamping.
 
 //Other Settings
@@ -517,7 +525,7 @@ uniform int SamplesXY <
 	ui_label = "Smoohting Amount";//Ya CeeJay.dk you got your way..
 	ui_tooltip = "This raises or lowers Samples used for the Final DeNoisers which in turn affects Performance.\n"
 				 "This also has the side effect of smoothing out the image so you get that Normal Like Smoothing.\n"
-				 "Default is 8.";
+				 "Default is 8 and you can override this a bit.";
 	ui_category = "Extra Options";
 > = 8;
 
@@ -915,7 +923,7 @@ sampler2D PCGIpastFrame { Texture = PCGIpastTex;
 	MipFilter = POINT;
 };
 
-texture2D PCGIaccuTex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
+texture2D PCGIaccuTex { Width = BUFFER_WIDTH / 2; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
 sampler2D PCGIaccuFrames { Texture = PCGIaccuTex; };
 //Seen issues with pooling this texture.. Workaround for 4.8.0- 
 texture2D PCGIcurrColorTex PoolTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;};
@@ -1306,7 +1314,7 @@ float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Targe
 	float3 GISamples, CurrAOGI = GI( texcoords, 0).rgb;
 
 	float3 antialiased = PastColor.xyz;
-	float mixRate = min( PastColor.w, 0.5), MB = 0.0;
+	float mixRate = min( PastColor.w, 0.5), MB = 0.0;//0.001;
 
 	antialiased = lerp( antialiased * antialiased, CurrAOGI.rgb * CurrAOGI.rgb, mixRate);
 	antialiased = sqrt( antialiased);
@@ -1325,23 +1333,22 @@ float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Targe
 	//Min Max neighbourhood clamping.
 	antialiased = clamp( antialiased, minColor, maxColor);
 	mixRate = rcp( 1.0 / mixRate + 1.0);
-    //float3 diff = antialiased - preclamping;
-    //diff.x = dot(diff,diff) * 4;
+	//float diff = length(antialiased - preclamping) * 4;
 	//Added Velocity Clamping.......
 	float clampAmount = V_Buffer;
 
 	mixRate += clampAmount;
-	mixRate = clamp( mixRate, 0.05, 0.5);
+	mixRate = clamp( mixRate, 0.0, 0.5);
 	//Sample from Accumulation buffer, with mix rate clamping.
 	float3 AA = lerp( 0, antialiased, D_Similarity);
 	return float4( AA, mixRate);
 }
-//Gaussian Blur Denoiser
+//Custom Gaussian Blur Denoiser
 float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
 {
 	float4 StoredNormals_Depth = tex2Dlod( PCGIcurrNormalsDepth,float4( texcoords, 0, 0));
 	float4 center = tex2D(Tex,texcoords), color = 0.0;//Like why do SmoothNormals when 2nd Level Denoiser is like Got you B#*@!........
-	float total = 0.0, NormalBlurFactor = 0.0, DepthBlurFactor = 0.001f,  DM = smoothstep(0,1,StoredNormals_Depth.w) > MaxDepth_Cutoff;
+	float total = 0.0, NormalBlurFactor = 1.0, DepthBlurFactor = Debug == 1 ? 0.001f : 1.0f,  DM = smoothstep(0,1,StoredNormals_Depth.w) > MaxDepth_Cutoff;
 	if(!DM)
 	{
 		if(SXY > 0) // Who would win Raw Boi or Gaussian Boi
@@ -1351,10 +1358,12 @@ float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
 	        	float2 D = Dir ? float2( i, 0) : float2( 0, i);
 				float2 TC = texcoords + D * R * pix;
 				float4 ModifiedNormals_Depth = tex2Dlod( PCGIcurrNormalsDepth, float4( TC, 0, 0));
-				float ModN = dot(ModifiedNormals_Depth.xyz, StoredNormals_Depth.xyz), ModD = abs( StoredNormals_Depth.w - ModifiedNormals_Depth.w);
-				if ( ModN > NormalBlurFactor && ModD < DepthBlurFactor )
+				float ModN = length(StoredNormals_Depth.xyz - ModifiedNormals_Depth.xyz),ModD = abs( StoredNormals_Depth.w - ModifiedNormals_Depth.w);
+		        float dist2 = max(ModN, 0.0);
+		        float n_w = min(exp(-(dist2)/NormalBlurFactor), 1.0);
+				if ( ModD < DepthBlurFactor) // I lie because I love you.
 				{
-	       	 	float weight = gaussian(i, sqrt(SXY));
+	       	 	float weight = gaussian(i, sqrt(SXY)) * n_w;
 	        		color += tex2Dlod(Tex, float4(TC ,0,0)) * weight;
 	        		total += weight;
 	        	}
