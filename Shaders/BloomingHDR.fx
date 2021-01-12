@@ -304,7 +304,7 @@ uniform bool Bloom_BA_iToneMapper <
 
 uniform int Auto_Exposure <
 	ui_type = "combo";
-	ui_label = "Auto Bloom";
+	ui_label = "Auto Exposure Type";
 	ui_items = "Off\0Auto Exposure & Eye Adaptation\0Auto Exposure & Eyelids Adaptation\0";
 	ui_tooltip = "This will enable the shader to adjust Exposure automaticly.\n"
 				 "This will also turn on Eye Adaptation for this shader.\n"
