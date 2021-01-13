@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 2.7
+//For Reshade 3.0+ PCGI Ver 2.8
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -158,6 +158,14 @@
 //
 // TLDR: Better Normal smoothing and noise removal in motion.
 //
+// Update 2.8
+//
+// I targeted Diffusion to work on the floors only. Because having it affect everything was not correct to me. I also Made the Debug View a bit cleaner.
+// With The cleaner Debug you  will see more detail. But, It will not cause the final output to show normal edges even if you see them in the Debug View.
+// I also made the De-Noiser go up to 20 now so........ Ya...... At any rate it better now!!!!! 
+//
+// Please Enjoy!
+//
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #if exists "Overwatch.fxh"                                           //Overwatch Interceptor//
 	#include "Overwatch.fxh"
@@ -225,7 +233,7 @@ static const float ig = 1.0;                 //LUT Gamma Adjustment 0.05 - 10.0
 //Use for real HDR. //Do not Use.
 #define HDR_Toggle 0 //For HDR //Do not Use.
 //Pooled Texture Issue for 4.8.0
-#if __RESHADE__ >= 40900 && ForcePool
+#if __RESHADE__ >= 40910 && ForcePool
 	#define PoolTex < pooled = true; >
 #else
 	#define PoolTex
@@ -521,7 +529,7 @@ uniform int Debug <
 
 uniform int SamplesXY <
 	ui_type = "slider";
-	ui_min = 0; ui_max = 16;
+	ui_min = 0; ui_max = 20;
 	ui_label = "Smoohting Amount";//Ya CeeJay.dk you got your way..
 	ui_tooltip = "This raises or lowers Samples used for the Final DeNoisers which in turn affects Performance.\n"
 				 "This also has the side effect of smoothing out the image so you get that Normal Like Smoothing.\n"
@@ -640,7 +648,7 @@ float2 GIRL()
 		return  float2(GI_Ray_Length,250);
 	#endif
 }
-static const float EvenSteven[20] = { 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20 , 22, 24, 26, 28, 30, 32, 34, 36, 38}; // It's not odd...
+static const float EvenSteven[21] = { 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20 , 22, 24, 26, 28, 30, 32, 34, 36, 38, 40}; // It's not odd...
 /////////////////////////////////////////////////////D3D Starts Here/////////////////////////////////////////////////////////////////
 static const float2 XYoffset[8] = { float2( 0,+pix.y ), float2( 0,-pix.y), float2(+pix.x, 0), float2(-pix.x, 0), float2(-pix.x,-pix.y), float2(+pix.x,-pix.y), float2(-pix.x,+pix.y), float2(+pix.x,+pix.y) };
 static const float DBoffsets[7] = { -5.5, -3.5, -1.5, 0.0, 1.5, 3.5, 5.5 };
@@ -676,19 +684,6 @@ void MCNoise(inout float Noise, float FC ,float2 TC,float seed)
 {   //This is the noise I used for rendering
 	float motion = FC, a = 12.9898, b = 78.233, c = 43758.5453, dt = dot( TC.xy * 2.0 , float2(a,b)), sn = fmod(dt,PI);
 	Noise = frac(frac(tan(distance(sn*(seed+dt),  float2(a,b)  )) * c) + 0.61803398875f * motion);
-}
-
-float2 Rotate2D_A( float2 r, float l )
-{   float Reflective_Diffusion = lerp(0.5,1.0,Reflectivness);
-	float2 Directions;
-	sincos(l,Directions[0],Directions[1]);//same as float2(cos(l),sin(l))
-	return float2( dot( r * Reflective_Diffusion, float2(Directions[1], -Directions[0]) ), dot( r, Directions.xy ) );
-}
-
-float2 Rotate2D_B( float2 r, float l )
-{   float2 Directions;
-	sincos(l,Directions[0],Directions[1]);//same as float2(cos(l),sin(l))
-	return float2( dot( r, float2(Directions[1], -Directions[0]) ), dot( r, Directions.xy ) );
 }
 
 float gaussian(float x, float sigma)
@@ -757,8 +752,7 @@ float max3(float x, float y, float z)
 }
 
 float3 inv_Tonemapper(float4 color)
-{   
-	//Timothy Lottes fast_reversible
+{   //Timothy Lottes fast_reversible
 	return color.rgb * rcp((1.0 + max(color.w,0.001)) - max3(color.r, color.g, color.b));
 }
 
@@ -1107,6 +1101,20 @@ float3 GetPosition(float2 texcoord)
 	return float3(texcoord.xy*2-1,1.0)*DM;
 }
 
+float2 Rotate2D_A( float2 r, float l , float2 TC)
+{   float Reflective_Diffusion = lerp(saturate(Reflectivness),1.0,smoothstep(0,0.25,1-dot(float3(0,1,0) ,NormalsMap(TC,0))));
+	float2 Directions;
+	sincos(l,Directions[0],Directions[1]);//same as float2(cos(l),sin(l))
+	return float2( dot( r * Reflective_Diffusion, float2(Directions[1], -Directions[0]) ), dot( r, Directions.xy ) );
+}
+
+float2 Rotate2D_B( float2 r, float l )
+{   float2 Directions;
+	sincos(l,Directions[0],Directions[1]);//same as float2(cos(l),sin(l))
+	return float2( dot( r, float2(Directions[1], -Directions[0]) ), dot( r, Directions.xy ) );
+}
+
+
 float SSSMasking(float2 TC)
 {
 	float SSSD = lerp(0,1, saturate(1-DepthMap(TC, 0 ) * lerp(1,10,SSS_Seek.x)) );
@@ -1198,7 +1206,7 @@ float4 PCGI(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Targ
 		if( smoothstep(0,1,D) > MaxDepth_Cutoff )
 			break;
 		//Evenly distributed points on Poisson Disk.... But, with High Frequency noise.
-		float2 GIWH = (pix * rl_gi_sss[0]) * random[0] * Rotate2D_A( PoissonTaps[i], random[3] ) / D0,
+		float2 GIWH = (pix * rl_gi_sss[0]) * random[0] * Rotate2D_A( PoissonTaps[i], random[3] , texcoord) / D0,
 			   GDWH = (pix * rl_gi_sss[1]) * random[1] * Rotate2D_B( PoissonTaps[i], random[2] ) / D0,
 			   SSWH = (pix * rl_gi_sss[2]) * random[2] * Rotate2D_B( PoissonTaps[i], random[1] ) / D1,
 			   TCWH = (pix * rl_gi_sss[3]) * random[3] * Rotate2D_B( PoissonTaps[i], random[0] ) / D1;
@@ -1348,8 +1356,8 @@ float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
 {
 	float4 StoredNormals_Depth = tex2Dlod( PCGIcurrNormalsDepth,float4( texcoords, 0, 0));
 	float4 center = tex2D(Tex,texcoords), color = 0.0;//Like why do SmoothNormals when 2nd Level Denoiser is like Got you B#*@!........
-	float total = 0.0, NormalBlurFactor = 1.0, DepthBlurFactor = Debug == 1 ? 0.001f : 1.0f,  DM = smoothstep(0,1,StoredNormals_Depth.w) > MaxDepth_Cutoff;
-	if(!DM)
+	float total = 0.0, NormalBlurFactor = Debug == 1 ? 0.1f : 1.0f, DepthBlurFactor = 1.0f,  DM = smoothstep(0,1,StoredNormals_Depth.w) > MaxDepth_Cutoff;
+	if(!DM)		 // I lie because I love you.
 	{
 		if(SXY > 0) // Who would win Raw Boi or Gaussian Boi
 		{
@@ -1361,7 +1369,7 @@ float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
 				float ModN = length(StoredNormals_Depth.xyz - ModifiedNormals_Depth.xyz),ModD = abs( StoredNormals_Depth.w - ModifiedNormals_Depth.w);
 		        float dist2 = max(ModN, 0.0);
 		        float n_w = min(exp(-(dist2)/NormalBlurFactor), 1.0);
-				if ( ModD < DepthBlurFactor) // I lie because I love you.
+				if ( ModD < DepthBlurFactor)
 				{
 	       	 	float weight = gaussian(i, sqrt(SXY)) * n_w;
 	        		color += tex2Dlod(Tex, float4(TC ,0,0)) * weight;
@@ -1375,12 +1383,12 @@ float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
 //Horizontal Denoising Upscaling
 float4 BGU_Hoz(float4 position : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 {   //float AO = Denoise(PCGIupsample_Info,texcoords,SamplesXY, 1, 4).w;
-	return float4( Denoise( BackBufferPCGI, texcoords, EvenSteven[clamp(SamplesXY,0,16)], 0, 4).rgb, 0);
+	return float4( Denoise( BackBufferPCGI, texcoords, EvenSteven[clamp(SamplesXY,0,20)], 0, 4).rgb, 0);
 }
 //Vertical Denoising Upscaling
 float4 BGU_Ver(float4 position : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 {
-	return Denoise( PCGI_BGUHorizontal_Sample, texcoords, EvenSteven[clamp(SamplesXY,0,16)], 1, 4);
+	return Denoise( PCGI_BGUHorizontal_Sample, texcoords, EvenSteven[clamp(SamplesXY,0,20)], 1, 4);
 }
 
 float3 overlay(float3 c, float3 b) 		{ return c<0.5f ? 2.0f*c*b:(1.0f-2.0f*(1.0f-c)*(1.0f-b));}
