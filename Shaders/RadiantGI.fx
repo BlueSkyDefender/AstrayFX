@@ -712,7 +712,7 @@ return p;
 }
 #endif
 float3 RGBtoYCbCr(float3 rgb)
-{
+{   float C[1];//The Chronicles of Riddick: Assault on Dark Athena FIX I don't know why it works.......
 	float Y  =  .299 * rgb.x + .587 * rgb.y + .114 * rgb.z; // Luminance
 	float Cb = -.169 * rgb.x - .331 * rgb.y + .500 * rgb.z; // Chrominance Blue
 	float Cr =  .500 * rgb.x - .419 * rgb.y - .081 * rgb.z; // Chrominance Red
