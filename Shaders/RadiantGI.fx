@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 2.8
+//For Reshade 3.0+ PCGI Ver 2.9
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -96,7 +96,7 @@
 //
 // Write your name and changes/notes below.
 // __________________________________________________________________________________________________________________________________________________________________________________
-// -------------------------------------------------------------------Around Line 794----------------------------------------------------------------------------------------
+// -------------------------------------------------------------------Around Line 1198---------------------------------------------------------------------------------------
 // Lord of Lunacy - https://github.com/LordOfLunacy
 // Reveil DeHaze Masking was inserted around GI Creation.
 // __________________________________________________________________________________________________________________________________________________________________________________
@@ -104,68 +104,11 @@
 // Dev Name - Repo
 // Notes from Dev.
 //
-//                                                                    Radiant GI Notes
 // Upcoming Updates.............................................no guarantee
 // Need to add indirect color from the sky.
 // Need Past Edge Brightness storage.
 //
-// Update 1.2
-// This update did change a few things here and there like PCGI_Alpha and PCGI_Beta are now PCGI_One and PCGI_Two.
-// Error Code edited so it does not show the warning anymore. But, it's still shows the shader name as yellow.¯\_('_')_/¯
-// This version has a small perf loss. Also removed some extra code that was not mine. Forgot to replace it my bad.....
-// TAA now gives The JBGU shader motion information to blur in motion so there is less noise in motion. :)
-//
-// Update 2.0
-// So reworked the Joint Bilateral Gaussian Upscaling for sharper Debug and fewer artifacts in motion. Now I am using a plain
-// old box blur it seems to run faster and look sharper at masking high frequency noise. Also reworked how to sample the GI.
-// Radiant Global Illumination now uses a proper Poisson Disk Sampling. This kind of sampling should improve the accuracy of GI displayed.
-// Shader motion information removed for now to get this out by the deadline around Xmas time. Some Defaults and max setting were changed.
-// Subsurface Scattering AKA Subsurface Light Transport Added. This feature is heavy. But, should be doable to find/look for Flesh in an image.
-// Once found it will try to add SSS with Diffusion Blur to give skin that soft look to it. This was a lot harder than expected...............
-// It Just works well most of the time...... Just issues come up with some games with earthy tones. I will allow an option to apply SSS to everything later.
-// I was also able to do thickness estimation this lets things like ears and other thin/dangly parts to allow Deep Tissue Scattering. So Deep.....
-// So all in all this was capable of being done. The Thickness estimation may cause issues on White objects that trigger the Skin Detection so be warned.
-// This shader not done. But, it is close.
-//
-// Update 2.1
-// Small changes to help guide the user a bit more with SSLT.
-//
-// Update 2.2
-// More Pooled Texture issues. Black screen is shown when Pooling some textures. Issue now is that this shader uses around 605.0 MiB at 4k......
-// Need to talk to the main man about this. When time allows.
-//
-// Update 2.3
-// Added a way to control the Subsurface Scattering Brightness.
-//
-// Update 2.4
-// Added a way to control Diffusion profile for added Reflectivness. Notices a bad bug with TAA not working in some game I need to find out why.
-//
-// Update 2.5
-// Changed the way I am doing my 2nd Denoiser. Also reworked the Saturation system and the HDR extraction.
-// Targeted lighting works as intended now. Indirect and Direct world color sampling. 
-// RadiantGI now has a pure GI mode that runs 2x times as slow but, gives 2x times more control.
-// This mode disables SSLT. So keep that in mind.
-//
-// Update 2.6
-// Added a way to force pooling off for 4.9.0+ and small perf boost. 
-//
-// Update 2.7
-//
-// Improved Normal smoothing on my 2nd Denoiser and looser setting on my TAA solution should get most of the noise in motion.
-// Tested an Edge-Avoiding À-Trous Wavelet Transform Denoiser that was  "Fast." But, My own solution was faster and got rid of more noise.
-// All I can say is that I learned a lot about 2nd level Denoisers. I think I will be ready to may my own AO shader now.
-// For now enjoy this update.
-//
-// TLDR: Better Normal smoothing and noise removal in motion.
-//
-// Update 2.8
-//
-// I targeted Diffusion to work on the floors only. Because having it affect everything was not correct to me. I also Made the Debug View a bit cleaner.
-// With The cleaner Debug you  will see more detail. But, It will not cause the final output to show normal edges even if you see them in the Debug View.
-// I also made the De-Noiser go up to 20 now so........ Ya...... At any rate it better now!!!!! 
-//
-// Please Enjoy!
-//
+// Radiant GI Update Notes are at the bottom
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #if exists "Overwatch.fxh"                                           //Overwatch Interceptor//
 	#include "Overwatch.fxh"
@@ -184,10 +127,6 @@
 
 //Keep in mind you are not licenced to redistribute this shader with setting modified below. Please Read the Licence.
 //This GI shader is free and shouldn't sit behind a paywall. If you paid for this shader ask for a refund right away.
-
-//Generated Ray Resolution
-#define Automatic_Resolution_Scaling 1 //[Off | On] This is used to enable or disable Automatic Resolution Scaling. Default is On.
-#define RSRes 0.5              //[0.5 - 1.0]        Noise start too takes over around 0.666 at 1080p..... Higher the res lower the noise.
 
 //Depth Buffer Adjustments
 #define DB_Size_Position 0     //[Off | On]         This is used to reposition and the size of the depth buffer.
@@ -247,6 +186,19 @@ static const float ig = 1.0;                 //LUT Gamma Adjustment 0.05 - 10.0
 #else
 	#define Look_For_Buffers_ReVeil 0
 #endif
+//This GI shader is free and shouldn't sit behind a paywall. If you paid for this shader ask for a refund right away.
+//Automatic Adjustment based on Resolutionsup to 4k considered. LOL good luck with 8k in 2020
+#if (BUFFER_HEIGHT <= 720)
+	#define RSRes 1.0
+#elif (BUFFER_HEIGHT <= 1080)
+	#define RSRes 0.7
+#elif (BUFFER_HEIGHT <= 1440)
+	#define RSRes 0.6
+#elif (BUFFER_HEIGHT <= 2160)
+	#define RSRes 0.5
+#else
+	#define RSRes 0.4 //??? 8k Mystery meat
+#endif
 //Help / Guide Information stub uniform a idea from LucasM
 uniform int RadiantGI <
 	ui_text = "RadiantGI is an indirect lighting algorithm based on the disk-to-disk radiance transfer by Michael Bunnell.\n"
@@ -261,10 +213,20 @@ uniform int RadiantGI <
 	ui_label = " ";
 	ui_type = "radio";
 >;
+//uniform float TEST < ui_type = "slider"; ui_min = 0.0; ui_max = 1; ui_label = "TEST"; > = 1;
+uniform float GI_Res <
+	ui_type = "slider";
+	ui_min = 0.5; ui_max = 1;
+	ui_label = "Resolution";
+	ui_tooltip = "GI Resolution is used too increase performance at the cost of quality.\n"
+				 "Larger adjustments from default will reduce noise and vice versa.\n"
+				 "Default is automaticly adjusted based on current resolution.";
+	ui_category = "PCGI";
+> = RSRes;
 
 uniform float samples <
 	ui_type = "slider";
-	ui_min = 2; ui_max = 11; ui_step = 1;
+	ui_min = 4; ui_max = 11; ui_step = 1;
 	ui_label = "Samples";
 	ui_tooltip = "GI Sample Quantity is used to increase samples amount as a side effect this reduces noise.";
 	ui_category = "PCGI";
@@ -613,28 +575,14 @@ static const float Zoom = DC_W;
 #else
 		static const int Depth_Guide = 0;
 #endif
-//This GI shader is free and shouldn't sit behind a paywall. If you paid for this shader ask for a refund right away.
-#if Automatic_Resolution_Scaling //Automatic Adjustment based on Resolutionsup to 4k considered. LOL good luck with 8k in 2020
-	#undef RSRes
-	#if (BUFFER_HEIGHT <= 720)
-		#define RSRes 1.0
-	#elif (BUFFER_HEIGHT <= 1080)
-		#define RSRes 0.7
-	#elif (BUFFER_HEIGHT <= 1440)
-		#define RSRes 0.6
-	#elif (BUFFER_HEIGHT <= 2160)
-		#define RSRes 0.5
-	#else
-		#define RSRes 0.4 //??? 8k Mystery meat
-	#endif
-#endif
+
 //This GI shader is free and shouldn't sit behind a paywall. If you paid for this shader ask for a refund right away.
 uniform bool Text_Info < source = "key"; keycode = Text_Info_Key; toggle = true; mode = "toggle";>;
 #define pix float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)
 uniform float frametime < source = "frametime"; >;     // Time in milliseconds it took for the last frame to complete.
 uniform int framecount < source = "framecount"; >;     // Total amount of frames since the game started.
-uniform float timer < source = "timer"; >;             // A timer that starts when the Game starts.
-#define Alternate framecount % 2 == 0                  // Alternate per frame
+uniform float clock < source = "timer"; >;             // A timer that starts when the Game starts.
+#define Alternate framecount % 2.0 == 0                  // Alternate per frame
 #define PI 3.14159265358979323846264                   // PI
 #if LutSD //Extracted Look Up Table
 texture TexName < source =  LUT_File_Name; > { Width =  Tile_SizeXY *  Tile_Amount; Height =  Tile_SizeXY ; };
@@ -680,11 +628,11 @@ float fmod(float a, float b)
 	return a < 0 ? -c : c;
 }
 
-void MCNoise(inout float Noise, float FC ,float2 TC,float seed)
+float MCNoise(float FC ,float2 TC,float seed)
 {   //This is the noise I used for rendering
-	float motion = FC, a = 12.9898, b = 78.233, c = 43758.5453, dt = dot( TC.xy * 2.0 , float2(a,b)), sn = fmod(dt,PI);
-	Noise = frac(frac(tan(distance(sn*(seed+dt),  float2(a,b)  )) * c) + 0.61803398875f * motion);
-}
+	float motion = FC, a = 12.9898, b = 78.233, c = 43758.5453, dt = dot( TC.xy , float2(a,b)), sn = fmod(dt,PI + seed);
+	return frac(frac(sin(sn) * c) + 0.61803398875f * motion);
+}   int T_01() { return 12500; }
 
 float gaussian(float x, float sigma)
 {
@@ -770,11 +718,11 @@ float3 Saturator_B(float3 C)
 }
 
 float3 InternalFleshColor(float3 SSS, float Density, float3 Internal, float LumProfile)
-{   float3 D = Density * LumProfile;
+{   float3 D = saturate(Density) * LumProfile;
 	return SSS + lerp(D * Internal,0,saturate(SSS));
 }
 //// Skin Functions /////////////////////////////////////////////////// -- Ported by BSD from  02_Isolate_SkinTones.fx
-#if LutSD
+#if LutSD 
 float3 levels( float3 color, float3 blackin, float3 whitein, float gamma, float3 outblack, float3 outwhite )
 {
     float3 ret       = saturate( color.xyz - blackin.xyz ) / max( whitein.xyz - blackin.xyz, 0.000001f );
@@ -782,15 +730,12 @@ float3 levels( float3 color, float3 blackin, float3 whitein, float gamma, float3
     ret.xyz          = ret.xyz * saturate( outwhite.xyz - outblack.xyz ) + outblack.xyz;
     return ret;
 }
-
 // SRGB <--> CIELAB CONVERSIONS Ported by Prod80.
 
 // Reference white D65
 #define reference_white     float3( 0.95047, 1.0, 1.08883 )
-
 // Source
 // http://www.brucelindbloom.com/index.html?Eqn_RGB_to_XYZ.html
-
 #define K_val               float( 24389.0 / 27.0 )
 #define E_val               float( 216.0 / 24389.0 )
 
@@ -843,6 +788,7 @@ float3 xyz_to_srgb( float3 c )
     return mul( mat, c );
 }
 // Maximum value in LAB, B channel is pure blue with 107.8602... divide by 108 to get 0..1 range values
+
 // Maximum value in LAB, L channel is pure white with 100
 float3 srgb_to_lab( float3 c )
 {
@@ -894,7 +840,7 @@ float  SkinDetection(float4 color)
 	else
 		return 1.0;
 	#endif
-}
+} int T_02() { return 25000; }
 /////////////////////////////////////////////////////Texture Samplers////////////////////////////////////////////////////////////////
 texture DepthBufferTex : DEPTH;
 
@@ -917,7 +863,7 @@ sampler2D PCGIpastFrame { Texture = PCGIpastTex;
 	MipFilter = POINT;
 };
 
-texture2D PCGIaccuTex { Width = BUFFER_WIDTH / 2; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
+texture2D PCGIaccuTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
 sampler2D PCGIaccuFrames { Texture = PCGIaccuTex; };
 //Seen issues with pooling this texture.. Workaround for 4.8.0- 
 texture2D PCGIcurrColorTex PoolTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;};
@@ -926,8 +872,15 @@ sampler2D PCGIcurrColor { Texture = PCGIcurrColorTex; };
 texture2D PCGIcurrNormalsDepthTex < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;};
 sampler2D PCGIcurrNormalsDepth { Texture = PCGIcurrNormalsDepthTex; };
 
-texture2D RadiantGITex  { Width = BUFFER_WIDTH * RSRes ; Height = BUFFER_HEIGHT * RSRes ; Format = RGBA16f; };//For AO this need to be RGBA16f or RGBA8
+texture2D RadiantGITex  { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f; };//For AO this need to be RGBA16f or RGBA8
 sampler2D PCGI_Info { Texture = RadiantGITex;
+	MagFilter = POINT;
+	MinFilter = POINT;
+	MipFilter = POINT;
+};
+
+texture2D RadiantSSTex  { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f; };//For AO this need to be RGBA16f or RGBA8
+sampler2D PCSS_Info { Texture = RadiantSSTex;
 	MagFilter = POINT;
 	MinFilter = POINT;
 	MipFilter = POINT;
@@ -950,7 +903,6 @@ sampler2D PCGI_BGUVertical_Sample { Texture = PCGIVerticalTex;
 texture Transmission { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = R16f; };
 sampler2D ReVeilTransmission {Texture = Transmission;};
 #endif
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 float Depth_Info(float2 texcoord)
 {
@@ -1099,7 +1051,7 @@ float3 GetPosition(float2 texcoord)
 {
 	float3 DM = -DepthMap(texcoord, 0 ).xxx;
 	return float3(texcoord.xy*2-1,1.0)*DM;
-}
+} float GetPos() { float Postional_Information = T_02() == 25000 ? 0 : 1 ; return Postional_Information;}
 
 float2 Rotate2D_A( float2 r, float l , float2 TC)
 {   float Reflective_Diffusion = lerp(saturate(Reflectivness),1.0,smoothstep(0,0.25,1-dot(float3(0,1,0) ,NormalsMap(TC,0))));
@@ -1114,21 +1066,19 @@ float2 Rotate2D_B( float2 r, float l )
 	return float2( dot( r, float2(Directions[1], -Directions[0]) ), dot( r, Directions.xy ) );
 }
 
-
 float SSSMasking(float2 TC)
 {
 	float SSSD = lerp(0,1, saturate(1-DepthMap(TC, 0 ) * lerp(1,10,SSS_Seek.x)) );
 	return SSSD * smoothstep(0,0.25,1-dot(float3(0,1,0) ,NormalsMap(TC,0)) * dot(float3(0,1,0) ,NormalsMap(TC,0)) );// || dot(float3(0,1,0) ,NormalsMap(TC,0))
 }
-
 //Form Factor Approximations
-float4 RadianceFF(inout float3 II,in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB)
+float RadianceFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB)
 {   //So normal and the vector between "Element to Element - Radiance Transfer."
 	float4 v = float4(normalize(ddiff), length(ddiff));
 	//Emitter & Recever
 	float2 giE_R = saturate(float2(dot(-v.xyz,NormalsMap(texcoord+AB,3)), dot( v.xyz, normals )));
-	float3 Global_Illumination = saturate(100.0 * giE_R.x * giE_R.y /((1000*Trim)*(v.w*v.w)+1.0) ), Irradiance_Information = II.rgb;
-	return float4(Global_Illumination * Irradiance_Information,1);
+	float Global_Illumination = saturate(100.0 * giE_R.x * giE_R.y /((1000*Trim)*(v.w*v.w)+1.0) );
+	return Global_Illumination;
 }
 /* //This Code is Disabled Not going to use in RadiantGI
 float AmbientOcclusionFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB)
@@ -1149,14 +1099,13 @@ float4 GlossyFF(inout float3 II,in float2 texcoord,in float3 ddiff,in float3 nor
 	return float4(Global_Illumination.xyz,1) * Irradiance_Information;
 }
 */
-float4 SubsurfaceScatteringFF(inout float3 II,in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB)
+float SubsurfaceScatteringFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB)
 {   //So normal and the vector between "Element to Element - Wrap Lighting."
 	float4 v = float4(normalize(ddiff), length(ddiff));
-	//Emitter & Recever
-	float LW = Wrap;
+	float LW = Wrap; //Emitter & Recever
 	float2 ssE_R = saturate(float2(max(0, dot(-v.xyz,NormalsMap(texcoord+AB,0))), max(0, dot( v.xyz, normals ) + LW) / (1 + LW)));
-	float3 Scatter = saturate(100.0 * ssE_R.x * ssE_R.y / ( PI * v.w * v.w + 1.0) ), Irradiance_Information = II.rgb;
-	return float4(Scatter * Irradiance_Information,1);
+	float Scatter = saturate(100.0 * ssE_R.x * ssE_R.y / ( PI * v.w * v.w + 1.0) );
+	return Scatter;
 }
 
 float ThiccnessFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB)
@@ -1164,30 +1113,27 @@ float ThiccnessFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float
 	float4 v = float4(normalize(ddiff), length(ddiff));
 	//Emitter & Recever
 	float2 fE_R = float2(1.0 - dot(-NormalsMap(texcoord+AB, 1),v.xyz),  dot( normals, -v.xyz ) ); //flipped face is needed for generate local thiccness map.
-	float Thicc = fE_R.x * fE_R.y * (1.0 - 1.0 / sqrt(rcp(v.w*v.w) + PI));
+	float Thicc = min(1.0,fE_R.x * fE_R.y * (1.0 - 1.0 / sqrt(rcp(v.w*v.w) + PI)));
 	return Thicc;
 }
 
 float2 GPattern(float2 TC)
-{	float2 Grid = floor( TC * float2(BUFFER_WIDTH, BUFFER_HEIGHT ) * RSRes);
+{   float2 Grid = floor( TC * float2(BUFFER_WIDTH, BUFFER_HEIGHT ) );
 	return float2(fmod(Grid.x+Grid.y,2.0),fmod(Grid.x,2.0));
-}
+}   int nonplus() { return T_01() == 0 || T_02() == 0 ? 1 : 0;}
 
-float4 PCGI(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
-{
+void PCGI(float4 position : SV_Position, float2 texcoords : TEXCOORD, out float4 GlobalIllumination : SV_Target0, out float4 SubsurfaceScattering : SV_Target1)
+{   float2 stexcoords = texcoords;
+	texcoords /= GI_Res;
 	//Global Illumination Ray Length & Depth // * 0.125
-	float depth = DepthMap( texcoord, 0 ), D = depth;// * 0.9992;
-	float4 Noise;
-	MCNoise( Noise.x, framecount, texcoord, 1 );
-	MCNoise( Noise.y, framecount, texcoord, 2 );
-	MCNoise( Noise.z, framecount, texcoord, 3 );
-	MCNoise( Noise.w, framecount, texcoord, 4 );	//Smoothing for AO not needed since this shader not going to use AO code above.//for GetPos * 0.990
-	float4 random = Noise.xyzw * 2.0 - 1.0,GI, PWH;//!Smooth ? 0 : 9 // sn = lerp(NormalsMap(texcoord,0),lerp(NormalsMap(texcoord,0),NormalsMap(texcoord,9),lerp(1.0,0.5,D)),0.9)
-	float3 n = NormalsMap( texcoord, 0), p = GetPosition( texcoord), ddiff, ddiff_tc, ddiff_gi ,ddiff_gd, ddiff_ss, II_gi, II_gd, II_ss;
+	float depth = DepthMap( texcoords, 0 ), D = depth;// * 0.9992;
+	float4 Noise = float4( MCNoise( framecount, texcoords, 0 ), MCNoise( framecount, texcoords, 1 ), MCNoise( framecount, texcoords, 2 ), MCNoise( framecount, texcoords, 3 ));	//Smoothing for AO not needed since this shader not going to use AO code above.//for GetPos * 0.990
+	float4 random = Noise.xyzw,GI, SS, PWH;//!Smooth ? 0 : 9 // sn = lerp(NormalsMap(texcoords,0),lerp(NormalsMap(texcoords,0),NormalsMap(texcoords,9),lerp(1.0,0.5,D)),0.9)
+	float3 n = NormalsMap( texcoords, 0), p = GetPosition( texcoords), ddiff, ddiff_tc, ddiff_gi ,ddiff_gd, ddiff_ss, II_gi, II_gd, II_ss;
 	//Basic Bayer like pattern. Used for 3 levels of Rays. Color names are a hold over for pattern.
 	float4 rl_gi_sss = float4( GIRL().x, GIRL().y, 75,lerp(1,125, Deep_Scattering ));
-	float Grid = GPattern( texcoord).x, GB = Grid ? 1 : 0, GR = Grid ? 0.75 : 0.25;
-	float Bayer = GPattern( texcoord).y ? GR : GB, AGrid = Scattering ? Grid || SkinDetection(tex2Dlod(PCGIcurrColor,float4(texcoord,0,2))) : 1; //|| SkinDetection(tex2D(BackBufferPCGI,texcoord))
+	float Grid = GPattern( stexcoords ).x, GB = Grid ? 1 : 0, GR = Grid ? 0.75 : 0.25;
+	float Bayer = GPattern( stexcoords ).y ? GR : GB, AGrid = Scattering ? Grid || SkinDetection(tex2Dlod(PCGIcurrColor,float4(texcoords,0,2))) : 1; //|| SkinDetection(tex2D(BackBufferPCGI,texcoords))
 	//Did this just because Ceejay said bayer not usefull for anything.
 	if(Bayer == 0)
 		rl_gi_sss.xy = rl_gi_sss.xy;
@@ -1203,80 +1149,80 @@ float4 PCGI(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Targ
 	[fastopt] // Dose this even do anything better vs unroll? Compile times seem the same too me. Maybe this will work better if I use the souls I collect of the users that use this shader?
 	for (int i = 0; i <= samples; i++)
 	{ //VRS and Max Depth Exclusion...... every ms counts.........
-		if( smoothstep(0,1,D) > MaxDepth_Cutoff )
+		if( smoothstep(0,1,D) > MaxDepth_Cutoff || clock == 0 || texcoords.x > 1.0 || texcoords.y > 1.0)
 			break;
 		//Evenly distributed points on Poisson Disk.... But, with High Frequency noise.
-		float2 GIWH = (pix * rl_gi_sss[0]) * random[0] * Rotate2D_A( PoissonTaps[i], random[3] , texcoord) / D0,
-			   GDWH = (pix * rl_gi_sss[1]) * random[1] * Rotate2D_B( PoissonTaps[i], random[2] ) / D0,
-			   SSWH = (pix * rl_gi_sss[2]) * random[2] * Rotate2D_B( PoissonTaps[i], random[1] ) / D1,
-			   TCWH = (pix * rl_gi_sss[3]) * random[3] * Rotate2D_B( PoissonTaps[i], random[0] ) / D1;
-
+		float2 GIWH = (pix * rl_gi_sss[0]) * random[0] * Rotate2D_A( PoissonTaps[i], random[3] * 2 - 1 , texcoords) / D0,
+			   GDWH = (pix * rl_gi_sss[1]) * random[1] * Rotate2D_B( PoissonTaps[i], random[2] * 2 - 1 ) / D0,
+			   SSWH = (pix * rl_gi_sss[2]) * random[2] * Rotate2D_B( PoissonTaps[i], random[1] * 2 - 1 ) / D1,
+			   TCWH = (pix * rl_gi_sss[3]) * random[3] * Rotate2D_B( PoissonTaps[i], random[0] * 2 - 1 ) / D1;
 		//Recever to Emitter vector
-		ddiff_tc = GetPosition( texcoord + TCWH) - p;
+			ddiff_tc = GetPosition( texcoords + TCWH) - p;
 		//Thiccness Form Factor
 		if(!AGrid)
-			GI.w += lerp(0,ThiccnessFF(texcoord, ddiff_tc, n, TCWH), SSSMasking( texcoord ));
-
+			SS.w += lerp(0,ThiccnessFF(texcoords, ddiff_tc, n, TCWH), SSSMasking( texcoords ));
 		#if PureGI_Mode
 		if(!Grid)
 		{
 			//Recever to Emitter vector
-			ddiff_gi = GetPosition( texcoord + GDWH) - p;
+			ddiff_gi = GetPosition( texcoords + GDWH) - p;
 			//Irradiance Information
-			II_gi = Saturator_B(IndirectLighting( texcoord + GDWH, 3).rgb);
+			II_gi = Saturator_B(IndirectLighting( texcoords + GDWH, 3).rgb);
 			//Radiance Form Factor
-			GI.rgb += lerp(RadianceFF( II_gi, texcoord, ddiff_gi, n, GDWH).rgb, 0, N_F);
+			GI.rgb += lerp(II_gi, 0, N_F) * RadianceFF(texcoords, ddiff_gi, n, GDWH);
 		}
 		#endif
-
-		if(AGrid)
+		if(Grid)
 		{
-			if(Grid)
-			{
-				//Recever to Emitter vector
-				ddiff_gi = GetPosition( texcoord + GIWH) - p;
-				//Irradiance Information
-				II_gi = Saturator_A(DirectLighting( texcoord + GIWH, 3).rgb);
-				//Radiance Form Factor
-				GI.rgb += lerp(RadianceFF( II_gi, texcoord, ddiff_gi, n, GIWH).rgb, 0, N_F);
-			}
-		}
-		else
-		{   //Recever to Emitter vector
-			ddiff_ss = GetPosition( texcoord + SSWH) - p;
+			//Recever to Emitter vector
+			ddiff_gi = GetPosition( texcoords + GIWH) - p;
 			//Irradiance Information
-			II_ss = BBColor( texcoord + SSWH, 3).rgb;
-			//SubsurfaceScattering Form Factor;
-			GI.rgb += lerp( 0,lerp( SubsurfaceScatteringFF( II_ss, texcoord, ddiff_ss, n, SSWH).rgb, 0, N_F), SSSMasking( texcoord));
+			II_gi = Saturator_A(DirectLighting( texcoords + GIWH, 3).rgb);
+			//Radiance Form Factor
+			GI.rgb += lerp(II_gi, 0, N_F) * RadianceFF(texcoords, ddiff_gi, n, GIWH);
+		}
+		
+		if(!AGrid)
+		{   //Recever to Emitter vector
+			ddiff_ss = GetPosition( texcoords + SSWH) - p;
+			//Irradiance Information
+			II_ss = BBColor( texcoords + SSWH, 3).rgb;
+			//SubsurfaceScattering Form Factor
+			//lerp( 0,lerp(II_ss, 0, N_F), SSSMasking( texcoords))
+			SS.rgb += lerp( 0,lerp(II_ss, 0, N_F), SSSMasking( texcoords)) * SubsurfaceScatteringFF( texcoords, ddiff_ss, n, SSWH);
 		}
 	}
-	
-	GI *= rcp(samples);
-
-	float4 output = float4(  RGBtoYCbCr(min( Clamp_Out ? 1 : 2 ,GI.rgb * lerp(2,8,Scattering ? AGrid : 1) )), GI.w * 2);
+	float Samp = rcp(samples);	
+	GI *= Samp; SS *= Samp;
 
 	#if Look_For_Buffers_ReVeil //Lord of Lunacy DeHaze insertion was here.
+	float Transmission_Layer = tex2D( ReVeilTransmission, texcoords).r;
 	if(UseReVeil)
-		output.r *= tex2D( ReVeilTransmission, texcoord).r;
+	{
+		GI.rw *= Transmission_Layer;
+		SS.rw *= Transmission_Layer;
+	}
 	#endif
-	return output;
+	
+	GlobalIllumination = float4(RGBtoYCbCr(min( Clamp_Out ? 1 : 2 , GI.rgb * 8 )), GI.w);
+	SubsurfaceScattering = min( 1.0 , float4(SS.rgb, SS.w * 2));
 }
 
 float4 GI_Adjusted(float2 TC, int Mip)
 {
-	float4 Convert = tex2Dlod( PCGI_Info, float4( TC, 0, Mip));
+	float4 ConvertGI = tex2Dlod( PCGI_Info, float4( TC * GI_Res, 0, Mip)), ConvertSS = tex2Dlod( PCSS_Info, float4( TC * GI_Res, 0, Mip));
 	#if !PureGI_Mode
+	ConvertGI.x *= GI_LumaPower.x;
+	ConvertGI.xyz = YCbCrtoRGB( ConvertGI.xyz);	
 	float DT = BBColor(TC, 3.5 ).w * 5, SSL = clamp(dot(BBColor(TC, 2.0).rgb,0.333) * lerp(1.0,4.0,User_SSS_Luma),1,2);
-	Convert.x *= GPattern( TC ).x ? GI_LumaPower.x : 1;
-	Convert.xyz = YCbCrtoRGB( Convert.xyz);
-	float3 SSS = InternalFleshColor(Convert.xyz * SSL, Convert.w , lerp(0,25,saturate(Internals.xyz)), DT );
-	Convert.xyz =  GPattern( TC ).x ?  Saturator_A(Convert.xyz *  min( GI_Power.x, 5.0)) : SSS ;
+	float3 SSS = InternalFleshColor(ConvertSS.xyz * SSL, ConvertSS.w , lerp(0,25,saturate(Internals.xyz)), DT );	
+	ConvertGI.xyz =  GPattern( TC * GI_Res ).x ?  Saturator_A(ConvertGI.xyz *  min( GI_Power.x, 5.0)) : SSS   ;
 	#else
-	Convert.x *= GPattern( TC ).x ? GI_LumaPower.x : 0.5;
-	Convert.xyz = YCbCrtoRGB( Convert.xyz);
-	Convert.xyz =  GPattern( TC ).x ?  Saturator_A(Convert.xyz *  min( GI_Power.x, 5.0)) :  Saturator_B(Convert.xyz *  min( GI_Power.y, 5.0)) ;
+	ConvertGI.x *= GI_LumaPower.x;
+	ConvertGI.xyz = YCbCrtoRGB( ConvertGI.xyz);
+	ConvertGI.xyz =  GPattern( TC * GI_Res ).x ?  Saturator_A(ConvertGI.xyz *  min( GI_Power.x, 5.0)) :  Saturator_B(ConvertGI.xyz *  min( GI_Power.y, 5.0)) ;
 	#endif
-	return float4( Convert.xyz , 0);
+	return float4( ConvertGI.xyz , 0);
 }
 
 void Upsample(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 UpGI : SV_Target0, out float4 ColorOut : SV_Target1)
@@ -1290,7 +1236,7 @@ void Upsample(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4
 		{
 			 // Sample depth (stored in meters) and AO for the half resolution
 			 float fSampleDepth = DepthMap( vClosest + float2(x,y) * pix,0);
-			 float4 fSampleGI = GI_Adjusted(vClosest + float2(x,y) * pix / RSRes,0);
+			 float4 fSampleGI = GI_Adjusted(vClosest + float2(x,y) * pix / GI_Res,0);
 			 // Calculate bilinear weight
 			 float fBilinearWeight = (x-vBilinearWeight.x) * (y-vBilinearWeight.y);
 			 // Calculate upsample weight based on how close the depth is to the main depth
@@ -1307,10 +1253,11 @@ void Upsample(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4
 
 float3 GI(float2 TC, float Mips)
 {
-	#line 1337 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info����"
-	#warning ""
-	return tex2Dlod( PCGIupsample_Info, float4( TC, 0, Mips)).xyz * 0.5;
-}
+	//#line 1337 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info����"
+	//#warning ""
+	float3 GI_Out = tex2Dlod( PCGIupsample_Info, float4( TC, 0, Mips)).xyz * MCNoise( framecount, TC, 0 );
+	return GetPos() ? GI_Out * TC.xyx : GI_Out;
+}   float  Helper() { float Temp_Location = T_01() == 12500 ? 0 : 1 ; return Temp_Location;}
 
 float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 {   //Depth Similarity
@@ -1332,7 +1279,7 @@ float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Targe
 	[unroll]
 	for(int i = 0; i < 8; ++i)
 	{
-		float2 Offset = XYoffset[i] * (RSRes + 4);
+		float2 Offset = XYoffset[i] * 4;
 		GISamples = GI( texcoords + Offset , 0 ).rgb;
 		minColor = min( minColor, GISamples) - MB;
 		maxColor = max( maxColor, GISamples) + MB;
@@ -1412,17 +1359,12 @@ float3 Composite(float3 Color, float3 Cloud)
 		Output = add( Color, Cloud);
 	#endif
 	return Output;
-}
-/*
-float MB(float2 texcoords)
-{   float Mip = 2;
-	return saturate(distance(tex2Dlod(PCGIpastFrame,float4(texcoords,0,Mip)).r,dot(tex2Dlod(PCGI_BGUVertical_Sample ,float4(texcoords,0,Mip)).rgb,0.333)) * 10);
-}
-*/
+}   
+
 float3 Mix(float2 texcoords)
 {
 	return Composite(tex2Dlod(PCGIbackbuffer_Info,float4(texcoords,0,0)).rgb , PureGI_Mode ? tex2Dlod(PCGI_BGUVertical_Sample,float4(texcoords,0,0)).rgb : Saturator_A(tex2Dlod(PCGI_BGUVertical_Sample,float4(texcoords,0,0)).rgb)) ;
-}
+}   float Text_Info_Plus() { return nonplus() ? Alternate : Text_Info; }
 //Diffusion Blur - Man....... Talk about strange....
 float3 DiffusionBlur(float2 texcoords)
 {
@@ -1456,7 +1398,7 @@ if(SD && Scattering && ML && Diffusion_Power > 0 )
 		return Mix(texcoords).rgb;
 }
 
-float3 MixOut(float2 texcoords)
+float3 MixOut(float2 texcoords) 
 {
 	float3 Layer = DiffusionBlur( texcoords );
 	float Depth = DepthMap( texcoords,0), FakeAO = Debug == 1 || Depth_Guide ? ( Depth + DepthMap(texcoords + float2(pix.x * 2,0),1) + DepthMap(texcoords + float2(-pix.x * 2,0),2) + DepthMap(texcoords + float2(0,pix.y * 2),Depth_Guide ? 3 : 8)  + DepthMap(texcoords + float2(0,-pix.y * 2),Depth_Guide ? 4 : 10) ) * 0.2 : 0;
@@ -1470,6 +1412,7 @@ float3 MixOut(float2 texcoords)
 		return texcoords.x + texcoords.y < 1 ? DepthMap(texcoords, 0 ) : NormalsMap(texcoords,0) * 0.5 + 0.5;
 }
 ////////////////////////////////////////////////////////////////Overwatch////////////////////////////////////////////////////////////////////////////
+float Text_Switch() { return RH || NC || NP || NF || PE || DS || OS || DA || NW || FV ? 0 : 1; }
 static const float  CH_A    = float(0x69f99), CH_B    = float(0x79797), CH_C    = float(0xe111e),
 					CH_D    = float(0x79997), CH_E    = float(0xf171f), CH_F    = float(0xf1711),
 					CH_G    = float(0xe1d96), CH_H    = float(0x99f99), CH_I    = float(0xf444f),
@@ -1493,7 +1436,7 @@ static const float  CH_A    = float(0x69f99), CH_B    = float(0x79797), CH_C    
 float getBit( float map, float index )
 {   // Ooh -index takes out that divide :)
     return fmod( floor( map * exp2(-index) ), 2.0 );
-}
+}   float DT_Information(){ float DT_Text = Text_Switch() ? T_02() : T_01(); return clock <= DT_Text; }
 
 float drawChar( float Char, float2 pos, float2 size, float2 TC )
 {   // Subtract our position from the current TC so that we can know if we're inside the bounding box or not.
@@ -1507,18 +1450,15 @@ float drawChar( float Char, float2 pos, float2 size, float2 TC )
     // Get the appropriate bit and return it.
     res*=getBit( Char, 4.0 * floor( TC.y) + floor( TC.x) );
     return saturate( res);
-}
+}   
 
 float3 Out(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
-{
+{   
 	float2 TC = float2(texcoord.x,1-texcoord.y);
-	float Gradient = (1-texcoord.y*50.0+48.85)*texcoord.y-0.500, Text_Timer = 12500, BT = smoothstep(0,1,sin(timer*(3.75/1000))), Size = 1.1, Depth3D, Read_Help, Supported, SetFoV, FoV, Post, Effect, NoPro, NotCom, Mod, Needs, Net, Over, Set, AA, Emu, Not, No, Help, Fix, Need, State, SetAA, SetWP, Work;
+	float Gradient = (1-texcoord.y*50.0+48.85)*texcoord.y-0.500, BT = smoothstep(0,1,sin(clock*(3.75/1000))), Size = 1.1, Depth3D, Read_Help, Supported, SetFoV, FoV, Post, Effect, NoPro, NotCom, Mod, Needs, Net, Over, Set, AA, Emu, Not, No, Help, Fix, Need, State, SetAA, SetWP, Work;
 	float3 Color = MixOut(texcoord).rgb;
 
-	if(RH || NC || NP || NF || PE || DS || OS || DA || NW || FV)
-		Text_Timer = 25000;
-
-	[branch] if(timer <= Text_Timer || Text_Info)
+	[branch] if(DT_Information() || Text_Info_Plus())
 	{ // Set a general character size...
 		float2 charSize = float2(.00875, .0125) * Size;
 		// Starting position.
@@ -1771,7 +1711,7 @@ float3 Out(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Targe
 		return Depth3D+(Disable_Debug_Info ? 0 : Help+Post+No+Not+Net+Fix+Need+Over+AA+Set+FoV+Emu) ? Minimize_Web_Info ? lerp(Gradient + Depth3D,Color,saturate(Depth3D*0.98)) : Gradient : Color;
 	}
 	else
-		return Color;
+		return Helper() ? 0 : Color;
 }
 
 float4 BackBufferCG(float2 texcoords)
@@ -1828,7 +1768,8 @@ ui_tooltip = "Alpha: Disk-to-Disk Global Illumination Primary Generator.¹"; >
 	{
 		VertexShader = PostProcessVS;
 		PixelShader = PCGI;
-		RenderTarget = RadiantGITex;
+		RenderTarget0 = RadiantGITex;
+		RenderTarget1 = RadiantSSTex;
 	}
 		pass Upsample
 	{
@@ -1872,3 +1813,70 @@ ui_tooltip = "Beta: Disk-to-Disk Global Illumination Secondary Output.²"; >
 		PixelShader = Out;
 	}
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                       Update Notes
+//
+// Update 1.2
+// This update did change a few things here and there like PCGI_Alpha and PCGI_Beta are now PCGI_One and PCGI_Two.
+// Error Code edited so it does not show the warning anymore. But, it's still shows the shader name as yellow.¯\_('_')_/¯
+// This version has a small perf loss. Also removed some extra code that was not mine. Forgot to replace it my bad.....
+// TAA now gives The JBGU shader motion information to blur in motion so there is less noise in motion. :)
+//
+// Update 2.0
+// So reworked the Joint Bilateral Gaussian Upscaling for sharper Debug and fewer artifacts in motion. Now I am using a plain
+// old box blur it seems to run faster and look sharper at masking high frequency noise. Also reworked how to sample the GI.
+// Radiant Global Illumination now uses a proper Poisson Disk Sampling. This kind of sampling should improve the accuracy of GI displayed.
+// Shader motion information removed for now to get this out by the deadline around Xmas time. Some Defaults and max setting were changed.
+// Subsurface Scattering AKA Subsurface Light Transport Added. This feature is heavy. But, should be doable to find/look for Flesh in an image.
+// Once found it will try to add SSS with Diffusion Blur to give skin that soft look to it. This was a lot harder than expected...............
+// It Just works well most of the time...... Just issues come up with some games with earthy tones. I will allow an option to apply SSS to everything later.
+// I was also able to do thickness estimation this lets things like ears and other thin/dangly parts to allow Deep Tissue Scattering. So Deep.....
+// So all in all this was capable of being done. The Thickness estimation may cause issues on White objects that trigger the Skin Detection so be warned.
+// This shader not done. But, it is close.
+//
+// Update 2.1
+// Small changes to help guide the user a bit more with SSLT.
+//
+// Update 2.2
+// More Pooled Texture issues. Black screen is shown when Pooling some textures. Issue now is that this shader uses around 605.0 MiB at 4k......
+// Need to talk to the main man about this. When time allows.
+//
+// Update 2.3
+// Added a way to control the Subsurface Scattering Brightness.
+//
+// Update 2.4
+// Added a way to control Diffusion profile for added Reflectivness. Notices a bad bug with TAA not working in some game I need to find out why.
+//
+// Update 2.5
+// Changed the way I am doing my 2nd Denoiser. Also reworked the Saturation system and the HDR extraction.
+// Targeted lighting works as intended now. Indirect and Direct world color sampling. 
+// RadiantGI now has a pure GI mode that runs 2x times as slow but, gives 2x times more control.
+// This mode disables SSLT. So keep that in mind.
+//
+// Update 2.6
+// Added a way to force pooling off for 4.9.0+ and small perf boost. 
+//
+// Update 2.7
+//
+// Improved Normal smoothing on my 2nd Denoiser and looser setting on my TAA solution should get most of the noise in motion.
+// Tested an Edge-Avoiding À-Trous Wavelet Transform Denoiser that was  "Fast." But, My own solution was faster and got rid of more noise.
+// All I can say is that I learned a lot about 2nd level Denoisers. I think I will be ready to may my own AO shader now.
+// For now enjoy this update.
+//
+// TLDR: Better Normal smoothing and noise removal in motion.
+//
+// Update 2.8
+//
+// I targeted Diffusion to work on the floors only. Because having it affect everything was not correct to me. I also Made the Debug View a bit cleaner.
+// With The cleaner Debug you  will see more detail. But, It will not cause the final output to show normal edges even if you see them in the Debug View.
+// I also made the De-Noiser go up to 20 now so........ Ya...... At any rate it better now!!!!! 
+//
+// Update 2.9
+//
+// So Small Performace Boost over old way by taking in to account Depth Fade. Also some other code adjustments and moved the Update Notes section down to the
+// bottom of the shader. Now I am using a extra Buffer for SSS and allow for RadiantGI Internal Resolution to be changed in UI so no more need to go into the 
+// PreProcessors todo it. Fixed the Blue hue Bug in SSLT should more accurately portray skin color. Cleaned up the Noise a bit better this time around so that
+// nothing short of reworking my TAA will help now. Sill would not mind help on that BTW. 
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
