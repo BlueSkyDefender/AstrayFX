@@ -1253,8 +1253,8 @@ void Upsample(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4
 
 float3 GI(float2 TC, float Mips)
 {
-	//#line 1337 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info¿½ï¿½ï¿½"
-	//#warning ""
+	#line 1337 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info¿½ï¿½ï¿½"
+	#warning ""
 	float3 GI_Out = tex2Dlod( PCGIupsample_Info, float4( TC, 0, Mips)).xyz * MCNoise( framecount, TC, 0 );
 	return GetPos() ? GI_Out * TC.xyx : GI_Out;
 }   float  Helper() { float Temp_Location = T_01() == 12500 ? 0 : 1 ; return Temp_Location;}
@@ -1874,9 +1874,9 @@ ui_tooltip = "Beta: Disk-to-Disk Global Illumination Secondary Output.Â²"; >
 //
 // Update 2.9
 //
-// So Small Performace Boost over old way by taking in to account Depth Fade. Also some other code adjustments and moved the Update Notes section down to the
+// So Small Performance Boost over old way by taking in to account Depth Fade. Also, some other code adjustments and moved the Update Notes section down to the
 // bottom of the shader. Now I am using a extra Buffer for SSS and allow for RadiantGI Internal Resolution to be changed in UI so no more need to go into the 
-// PreProcessors todo it. Fixed the Blue hue Bug in SSLT should more accurately portray skin color. Cleaned up the Noise a bit better this time around so that
+// PreProcessors to-do it. Fixed the Blue hue Bug in SSLT should more accurately portray skin color. Cleaned up the Noise a bit better this time around so that
 // nothing short of reworking my TAA will help now. Sill would not mind help on that BTW. 
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
