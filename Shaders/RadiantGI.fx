@@ -1127,9 +1127,9 @@ void PCGI(float4 position : SV_Position, float2 texcoords : TEXCOORD, out float4
 	texcoords /= GI_Res;
 	//Global Illumination Ray Length & Depth // * 0.125
 	float depth = DepthMap( texcoords, 0 ), D = depth;// * 0.9992;
-	float4 Noise = float4( MCNoise( framecount, texcoords, 0 ), MCNoise( framecount, texcoords, 1 ), MCNoise( framecount, texcoords, 2 ), MCNoise( framecount, texcoords, 3 ));	//Smoothing for AO not needed since this shader not going to use AO code above.//for GetPos * 0.990
+	float4 Noise = float4( MCNoise( framecount, texcoords, 1 ), MCNoise( framecount, texcoords, 2 ), MCNoise( framecount, texcoords, 3 ), MCNoise( framecount, texcoords, 4 ));	//Smoothing for AO not needed since this shader not going to use AO code above.//for GetPos * 0.990
 	float4 random = Noise.xyzw,GI, SS, PWH;//!Smooth ? 0 : 9 // sn = lerp(NormalsMap(texcoords,0),lerp(NormalsMap(texcoords,0),NormalsMap(texcoords,9),lerp(1.0,0.5,D)),0.9)
-	float3 n = NormalsMap( texcoords, 0), p = GetPosition( texcoords), ddiff, ddiff_tc, ddiff_gi ,ddiff_gd, ddiff_ss, II_gi, II_gd, II_ss;
+	float3 n = NormalsMap( texcoords, 0), p = GetPosition( texcoords) * 0.990, ddiff, ddiff_tc, ddiff_gi ,ddiff_gd, ddiff_ss, II_gi, II_gd, II_ss;
 	//Basic Bayer like pattern. Used for 3 levels of Rays. Color names are a hold over for pattern.
 	float4 rl_gi_sss = float4( GIRL().x, GIRL().y, 75,lerp(1,125, Deep_Scattering ));
 	float Grid = GPattern( stexcoords ).x, GB = Grid ? 1 : 0, GR = Grid ? 0.75 : 0.25;
