@@ -295,7 +295,7 @@ static const float2 SSS_Seek = 0.5;
 				     "Default is Off.";
 		ui_category = "SSLT";
 	> = false;
-	
+
 	uniform float Wrap <
 		ui_type = "slider";
 		ui_min = 0.0; ui_max = 1.0;
@@ -304,7 +304,7 @@ static const float2 SSS_Seek = 0.5;
 				     "Default is [0.5].";
 		ui_category = "SSLT";
 	> = 0.5;
-	
+
 	uniform float User_SSS_Luma <
 		ui_type = "slider";
 		ui_min = 0.0; ui_max = 1.0;
@@ -314,7 +314,7 @@ static const float2 SSS_Seek = 0.5;
 				     "Default is [0.5].";
 		ui_category = "SSLT";
 	> = 0.5;
-	
+
 	uniform float Deep_Scattering <
 		ui_type = "slider";
 		ui_min = 0.0; ui_max = 1.0;
@@ -323,7 +323,7 @@ static const float2 SSS_Seek = 0.5;
 				     "Default is [0.1].";
 		ui_category = "SSLT";
 	> = 0.1;
-	
+
 	uniform float4 Internals < // We are all pink and fleshy on the inside?
 		ui_type = "slider";
 		ui_min = 0.0; ui_max = 1.0;
@@ -333,7 +333,7 @@ static const float2 SSS_Seek = 0.5;
 				     "Defaults are [R 0.333] [B 0.0] [G 0.0] [L 0.5].";
 		ui_category = "SSLT";
 	> = float4(0.333,0.0,0.0,0.5);
-	
+
 	uniform float Diffusion_Power <
 		ui_type = "slider";
 		ui_min = 0.0; ui_max = 1.0;
@@ -343,7 +343,7 @@ static const float2 SSS_Seek = 0.5;
 				     "Default is [0.5].";
 		ui_category = "SSLT";
 	> = 0.5;
-	
+
 	#if LutSD //Man............................................
 	uniform float2 SSS_Seek <
 	#else
@@ -705,11 +705,11 @@ float3 inv_Tonemapper(float4 color)
 }
 
 float3 Saturator_A(float3 C)
-{	
+{
 	return lerp(Luma(C.rgb), C.rgb, Saturation.x );
 }
 float3 Saturator_B(float3 C)
-{	
+{
 	#if PureGI_Mode
 	return lerp(Luma(C.rgb), C.rgb, Saturation.y );
 	#else
@@ -722,7 +722,7 @@ float3 InternalFleshColor(float3 SSS, float Density, float3 Internal, float LumP
 	return SSS + lerp(D * Internal,0,saturate(SSS));
 }
 //// Skin Functions /////////////////////////////////////////////////// -- Ported by BSD from  02_Isolate_SkinTones.fx
-#if LutSD 
+#if LutSD
 float3 levels( float3 color, float3 blackin, float3 whitein, float gamma, float3 outblack, float3 outwhite )
 {
     float3 ret       = saturate( color.xyz - blackin.xyz ) / max( whitein.xyz - blackin.xyz, 0.000001f );
@@ -865,7 +865,7 @@ sampler2D PCGIpastFrame { Texture = PCGIpastTex;
 
 texture2D PCGIaccuTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
 sampler2D PCGIaccuFrames { Texture = PCGIaccuTex; };
-//Seen issues with pooling this texture.. Workaround for 4.8.0- 
+//Seen issues with pooling this texture.. Workaround for 4.8.0-
 texture2D PCGIcurrColorTex PoolTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;};
 sampler2D PCGIcurrColor { Texture = PCGIcurrColorTex; };
 
@@ -891,10 +891,10 @@ sampler2D PCGIupsample_Info { Texture = PCGIupsampleTex; };
 
 texture2D PCGIbackbufferTex < pooled = true; > { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f;  };
 sampler2D PCGIbackbuffer_Info { Texture = PCGIbackbufferTex; };
-//Seen issues with pooling this texture.. Workaround for 4.8.0- 
+//Seen issues with pooling this texture.. Workaround for 4.8.0-
 texture2D PCGIHorizontalTex PoolTex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
 sampler2D PCGI_BGUHorizontal_Sample { Texture = PCGIHorizontalTex;};
-//Seen issues with pooling this texture.. Workaround for 4.8.0- 
+//Seen issues with pooling this texture.. Workaround for 4.8.0-
 texture2D PCGIVerticalTex PoolTex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
 sampler2D PCGI_BGUVertical_Sample { Texture = PCGIVerticalTex;
 };
@@ -1028,7 +1028,7 @@ float4 DirectLighting(float2 texcoords , int Mips)
 	float4 BC = BBColor(texcoords, Mips);
 	if(HDR_BP > 0)
 		BC.rgb = inv_Tonemapper(float4(BC.rgb,1-HDR_BP));
-		
+
 	float  GS = Luma(BC.rgb);
 		   BC.rgb /= GS;
 		   BC.rgb *= saturate(GS - lerp(0.0,0.5,saturate(Target_Lighting)));
@@ -1181,7 +1181,7 @@ void PCGI(float4 position : SV_Position, float2 texcoords : TEXCOORD, out float4
 			//Radiance Form Factor
 			GI.rgb += lerp(II_gi, 0, N_F) * RadianceFF(texcoords, ddiff_gi, n, GIWH);
 		}
-		
+
 		if(!AGrid)
 		{   //Recever to Emitter vector
 			ddiff_ss = GetPosition( texcoords + SSWH) - p;
@@ -1192,18 +1192,18 @@ void PCGI(float4 position : SV_Position, float2 texcoords : TEXCOORD, out float4
 			SS.rgb += lerp( 0,lerp(II_ss, 0, N_F), SSSMasking( texcoords)) * SubsurfaceScatteringFF( texcoords, ddiff_ss, n, SSWH);
 		}
 	}
-	float Samp = rcp(samples);	
+	float Samp = rcp(samples);
 	GI *= Samp; SS *= Samp;
 
 	#if Look_For_Buffers_ReVeil //Lord of Lunacy DeHaze insertion was here.
 	float Transmission_Layer = tex2D( ReVeilTransmission, texcoords).r;
 	if(UseReVeil)
 	{
-		GI.rw *= Transmission_Layer;
-		SS.rw *= Transmission_Layer;
+		GI.xw *= Transmission_Layer;
+		SS.xw *= Transmission_Layer;
 	}
 	#endif
-	
+
 	GlobalIllumination = float4(RGBtoYCbCr(min( Clamp_Out ? 1 : 2 , GI.rgb * 8 )), GI.w);
 	SubsurfaceScattering = min( 1.0 , float4(SS.rgb, SS.w * 2));
 }
@@ -1213,9 +1213,9 @@ float4 GI_Adjusted(float2 TC, int Mip)
 	float4 ConvertGI = tex2Dlod( PCGI_Info, float4( TC * GI_Res, 0, Mip)), ConvertSS = tex2Dlod( PCSS_Info, float4( TC * GI_Res, 0, Mip));
 	#if !PureGI_Mode
 	ConvertGI.x *= GI_LumaPower.x;
-	ConvertGI.xyz = YCbCrtoRGB( ConvertGI.xyz);	
+	ConvertGI.xyz = YCbCrtoRGB( ConvertGI.xyz);
 	float DT = BBColor(TC, 3.5 ).w * 5, SSL = clamp(dot(BBColor(TC, 2.0).rgb,0.333) * lerp(1.0,4.0,User_SSS_Luma),1,2);
-	float3 SSS = InternalFleshColor(ConvertSS.xyz * SSL, ConvertSS.w , lerp(0,25,saturate(Internals.xyz)), DT );	
+	float3 SSS = InternalFleshColor(ConvertSS.xyz * SSL, ConvertSS.w , lerp(0,25,saturate(Internals.xyz)), DT );
 	ConvertGI.xyz =  GPattern( TC * GI_Res ).x ?  Saturator_A(ConvertGI.xyz *  min( GI_Power.x, 5.0)) : SSS   ;
 	#else
 	ConvertGI.x *= GI_LumaPower.x;
@@ -1253,7 +1253,7 @@ void Upsample(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4
 
 float3 GI(float2 TC, float Mips)
 {
-	#line 1337 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info¿½ï¿½ï¿½"
+	#line 1337 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info¿½ï¿½ï¿½ï¿½"
 	#warning ""
 	float3 GI_Out = tex2Dlod( PCGIupsample_Info, float4( TC, 0, Mips)).xyz * MCNoise( framecount, TC, 0 );
 	return GetPos() ? GI_Out * TC.xyx : GI_Out;
@@ -1359,7 +1359,7 @@ float3 Composite(float3 Color, float3 Cloud)
 		Output = add( Color, Cloud);
 	#endif
 	return Output;
-}   
+}
 
 float3 Mix(float2 texcoords)
 {
@@ -1398,7 +1398,7 @@ if(SD && Scattering && ML && Diffusion_Power > 0 )
 		return Mix(texcoords).rgb;
 }
 
-float3 MixOut(float2 texcoords) 
+float3 MixOut(float2 texcoords)
 {
 	float3 Layer = DiffusionBlur( texcoords );
 	float Depth = DepthMap( texcoords,0), FakeAO = Debug == 1 || Depth_Guide ? ( Depth + DepthMap(texcoords + float2(pix.x * 2,0),1) + DepthMap(texcoords + float2(-pix.x * 2,0),2) + DepthMap(texcoords + float2(0,pix.y * 2),Depth_Guide ? 3 : 8)  + DepthMap(texcoords + float2(0,-pix.y * 2),Depth_Guide ? 4 : 10) ) * 0.2 : 0;
@@ -1450,10 +1450,10 @@ float drawChar( float Char, float2 pos, float2 size, float2 TC )
     // Get the appropriate bit and return it.
     res*=getBit( Char, 4.0 * floor( TC.y) + floor( TC.x) );
     return saturate( res);
-}   
+}
 
 float3 Out(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
-{   
+{
 	float2 TC = float2(texcoord.x,1-texcoord.y);
 	float Gradient = (1-texcoord.y*50.0+48.85)*texcoord.y-0.500, BT = smoothstep(0,1,sin(clock*(3.75/1000))), Size = 1.1, Depth3D, Read_Help, Supported, SetFoV, FoV, Post, Effect, NoPro, NotCom, Mod, Needs, Net, Over, Set, AA, Emu, Not, No, Help, Fix, Need, State, SetAA, SetWP, Work;
 	float3 Color = MixOut(texcoord).rgb;
@@ -1722,7 +1722,7 @@ float4 BackBufferCG(float2 texcoords)
 
 void CurrentFrame(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Color : SV_Target0, out float4 NormalsDepth : SV_Target1)
 {
-	float4 BBCG = BackBufferCG(texcoords);		
+	float4 BBCG = BackBufferCG(texcoords);
 	float DI = Depth_Info(texcoords);
 	Color = float4(BBCG.rgb,max(0.0, BBCG.w - lerp(0,1,saturate(Internals.w))));//,0, smoothstep(0,1,DI) > MaxDepth_Cutoff ) ;
 	NormalsDepth = float4(DepthNormals(texcoords),DI);
@@ -1850,12 +1850,12 @@ ui_tooltip = "Beta: Disk-to-Disk Global Illumination Secondary Output.Â²"; >
 //
 // Update 2.5
 // Changed the way I am doing my 2nd Denoiser. Also reworked the Saturation system and the HDR extraction.
-// Targeted lighting works as intended now. Indirect and Direct world color sampling. 
+// Targeted lighting works as intended now. Indirect and Direct world color sampling.
 // RadiantGI now has a pure GI mode that runs 2x times as slow but, gives 2x times more control.
 // This mode disables SSLT. So keep that in mind.
 //
 // Update 2.6
-// Added a way to force pooling off for 4.9.0+ and small perf boost. 
+// Added a way to force pooling off for 4.9.0+ and small perf boost.
 //
 // Update 2.7
 //
@@ -1870,13 +1870,13 @@ ui_tooltip = "Beta: Disk-to-Disk Global Illumination Secondary Output.Â²"; >
 //
 // I targeted Diffusion to work on the floors only. Because having it affect everything was not correct to me. I also Made the Debug View a bit cleaner.
 // With The cleaner Debug you  will see more detail. But, It will not cause the final output to show normal edges even if you see them in the Debug View.
-// I also made the De-Noiser go up to 20 now so........ Ya...... At any rate it better now!!!!! 
+// I also made the De-Noiser go up to 20 now so........ Ya...... At any rate it better now!!!!!
 //
 // Update 2.9
 //
 // So Small Performance Boost over old way by taking in to account Depth Fade. Also, some other code adjustments and moved the Update Notes section down to the
-// bottom of the shader. Now I am using a extra Buffer for SSS and allow for RadiantGI Internal Resolution to be changed in UI so no more need to go into the 
+// bottom of the shader. Now I am using a extra Buffer for SSS and allow for RadiantGI Internal Resolution to be changed in UI so no more need to go into the
 // PreProcessors to-do it. Fixed the Blue hue Bug in SSLT should more accurately portray skin color. Cleaned up the Noise a bit better this time around so that
-// nothing short of reworking my TAA will help now. Sill would not mind help on that BTW. 
+// nothing short of reworking my TAA will help now. Sill would not mind help on that BTW.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
