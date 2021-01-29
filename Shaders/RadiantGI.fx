@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 2.9
+//For Reshade 3.0+ PCGI Ver 2.9.1
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -1167,7 +1167,7 @@ void PCGI(float4 position : SV_Position, float2 texcoords : TEXCOORD, out float4
 			//Recever to Emitter vector
 			ddiff_gi = GetPosition( texcoords + GDWH) - p;
 			//Irradiance Information
-			II_gi = Saturator_B(IndirectLighting( texcoords + GDWH, 3).rgb);
+			II_gi = saturate(Saturator_B(IndirectLighting( texcoords + GDWH, 3).rgb));
 			//Radiance Form Factor
 			GI.rgb += lerp(II_gi, 0, N_F) * RadianceFF(texcoords, ddiff_gi, n, GDWH);
 		}
@@ -1177,7 +1177,7 @@ void PCGI(float4 position : SV_Position, float2 texcoords : TEXCOORD, out float4
 			//Recever to Emitter vector
 			ddiff_gi = GetPosition( texcoords + GIWH) - p;
 			//Irradiance Information
-			II_gi = Saturator_A(DirectLighting( texcoords + GIWH, 3).rgb);
+			II_gi = saturate(Saturator_A(DirectLighting( texcoords + GIWH, 3).rgb));
 			//Radiance Form Factor
 			GI.rgb += lerp(II_gi, 0, N_F) * RadianceFF(texcoords, ddiff_gi, n, GIWH);
 		}
@@ -1878,5 +1878,10 @@ ui_tooltip = "Beta: Disk-to-Disk Global Illumination Secondary Output.²"; >
 // bottom of the shader. Now I am using a extra Buffer for SSS and allow for RadiantGI Internal Resolution to be changed in UI so no more need to go into the
 // PreProcessors to-do it. Fixed the Blue hue Bug in SSLT should more accurately portray skin color. Cleaned up the Noise a bit better this time around so that
 // nothing short of reworking my TAA will help now. Sill would not mind help on that BTW.
+//
+// Sub-Update 2.9.1
+//
+// Bug fix Low light issue. Shader will no longer generate rays in low light situations. Rays went Burrrrrrrrrrrrr too much needed and to cap it.
+// Ya,too much Burrrrrrr.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
