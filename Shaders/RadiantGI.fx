@@ -330,9 +330,9 @@ static const float2 SSS_Seek = 0.5;
 		ui_label = "Internal Color & Luma Map";
 		ui_tooltip = "Since I can't tell what the internal color of the Deep Tissue you need to set this your self for RGB.\n"
 				     "The last one controls the Luma Map that lets bright lights approximate deep tissue color.\n"
-				     "Defaults are [R 0.333] [B 0.0] [G 0.0] [L 0.5].";
+				     "Defaults are [R 0.25] [B 0.0] [G 0.0] [L 0.5].";
 		ui_category = "SSLT";
-	> = float4(0.333,0.0,0.0,0.5);
+	> = float4(0.25,0.0,0.0,0.5);
 
 	uniform float Diffusion_Power <
 		ui_type = "slider";
