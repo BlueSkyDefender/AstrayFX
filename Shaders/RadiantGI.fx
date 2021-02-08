@@ -483,7 +483,7 @@ uniform bool Depth_Map_Flip <
 > = DB_X;
 uniform int Debug <
 	ui_type = "combo";
-	ui_items = "RadiantGI\0Irradiance Map\0Depth & Normals\0";
+	ui_items = "RadiantGI\0Irradiance Map\0Light Source Map\0Depth & Normals\0";
 	ui_label = "Debug View";
 	ui_tooltip = "View Debug Buffers.";
 	ui_category = "Extra Options";
@@ -504,7 +504,7 @@ uniform int SamplesXY <
 		ui_label = "Use Transmission from ReVeil";
 		ui_tooltip = "Requires ReVeil to be enabled (Lord of Lunacy waz here)";
 		ui_category = "Extra Options";
-	> = true;
+	> = false;
 #endif
 #if DB_Size_Position || SP == 2
 uniform float2 Horizontal_and_Vertical <
@@ -1029,10 +1029,12 @@ float4 DirectLighting(float2 texcoords , int Mips)
 	if(HDR_BP > 0)
 		BC.rgb = inv_Tonemapper(float4(BC.rgb,1-HDR_BP));
 
-	float  GS = Luma(BC.rgb);
+	float  GS = Luma(BC.rgb), Boost = 1;
 		   BC.rgb /= GS;
 		   BC.rgb *= saturate(GS - lerp(0.0,0.5,saturate(Target_Lighting)));
-	return float4(Saturator_A(BC.rgb),BC.a);
+		  if(!PureGI_Mode)
+			Boost = lerp(1,2.5,saturate(Target_Lighting));
+	return float4(Saturator_A(BC.rgb * Boost),BC.a);
 }
 
 float4 IndirectLighting(float2 texcoords , int Mips)
@@ -1044,6 +1046,7 @@ float4 IndirectLighting(float2 texcoords , int Mips)
 	float  GS = Luma(BC.rgb);
 		   BC.rgb /= 1-GS;
 		   BC.rgb *= 1-saturate(GS + lerp(0.0,0.5,saturate(Target_Lighting)));
+		   
 	return float4(Saturator_B(BC.rgb * lerp(1.0,2.0,saturate(Target_Lighting))),BC.a);
 }
 
@@ -1199,8 +1202,8 @@ void PCGI(float4 position : SV_Position, float2 texcoords : TEXCOORD, out float4
 	float Transmission_Layer = tex2D( ReVeilTransmission, texcoords).r;
 	if(UseReVeil)
 	{
-		GI.xw *= Transmission_Layer;
-		SS.xw *= Transmission_Layer;
+		GI.xyzw *= Transmission_Layer;
+		SS.xyzw *= Transmission_Layer;
 	}
 	#endif
 
@@ -1401,13 +1404,16 @@ if(SD && Scattering && ML && Diffusion_Power > 0 )
 float3 MixOut(float2 texcoords)
 {
 	float3 Layer = DiffusionBlur( texcoords );
-	float Depth = DepthMap( texcoords,0), FakeAO = Debug == 1 || Depth_Guide ? ( Depth + DepthMap(texcoords + float2(pix.x * 2,0),1) + DepthMap(texcoords + float2(-pix.x * 2,0),2) + DepthMap(texcoords + float2(0,pix.y * 2),Depth_Guide ? 3 : 8)  + DepthMap(texcoords + float2(0,-pix.y * 2),Depth_Guide ? 4 : 10) ) * 0.2 : 0;
+	float2 Grid = floor( texcoords * float2(BUFFER_WIDTH, BUFFER_HEIGHT ) * pix * 125);//125 lines
+	float ID_DL = PureGI_Mode ? fmod(Grid.y,2.0) : 0, Depth = DepthMap( texcoords,0), FakeAO = Debug == 1 || Depth_Guide ? ( Depth + DepthMap(texcoords + float2(pix.x * 2,0),1) + DepthMap(texcoords + float2(-pix.x * 2,0),2) + DepthMap(texcoords + float2(0,pix.y * 2),Depth_Guide ? 3 : 8)  + DepthMap(texcoords + float2(0,-pix.y * 2),Depth_Guide ? 4 : 10) ) * 0.2 : 0;
 	float3 Output = tex2D( PCGI_BGUVertical_Sample, texcoords).rgb;
-
+	
 	if(Debug == 0)
 		return Depth_Guide ? Layer * float3((Depth/FakeAO> 0.998),1,(Depth/FakeAO > 0.998))  : Layer;
 	else if(Debug == 1)
 		return lerp(Output + 0.50 * lerp(1-(Depth-FakeAO) ,1,smoothstep(0,1,Depth) == 1),Output,Dark_Mode); //This fake AO is a lie..........
+	else if(Debug == 2)
+		return ID_DL ? dot(IndirectLighting(texcoords, 0).rgb,0.333) * IndirectLighting(texcoords, 3).rgb : dot(DirectLighting( texcoords, 0).rgb,0.333) * DirectLighting( texcoords, 3).rgb;
 	else
 		return texcoords.x + texcoords.y < 1 ? DepthMap(texcoords, 0 ) : NormalsMap(texcoords,0) * 0.5 + 0.5;
 }
@@ -1748,7 +1754,7 @@ void PostProcessVS(in uint id : SV_VertexID, out float4 position : SV_Position, 
 }
 //*Rendering passes*//
 technique PCGI_One
-< toggle = 0x23;
+< toggle = 0x2E;
 ui_tooltip = "Alpha: Disk-to-Disk Global Illumination Primary Generator.¹"; >
 {
 		pass PastFrames
@@ -1792,7 +1798,7 @@ ui_tooltip = "Alpha: Disk-to-Disk Global Illumination Primary Generator.¹"; >
 }
 
 technique PCGI_Two
-< toggle = 0x23;
+< toggle = 0x2E;
 ui_tooltip = "Beta: Disk-to-Disk Global Illumination Secondary Output.²"; >
 {
 		pass Bilateral_Gaussian_Upscaling_H
