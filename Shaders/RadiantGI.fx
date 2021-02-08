@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 2.9.1
+//For Reshade 3.0+ PCGI Ver 2.9.2
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -1889,5 +1889,10 @@ ui_tooltip = "Beta: Disk-to-Disk Global Illumination Secondary Output.²"; >
 //
 // Bug fix Low light issue. Shader will no longer generate rays in low light situations. Rays went Burrrrrrrrrrrrr too much needed and to cap it.
 // Ya,too much Burrrrrrr.
+//
+// Sub-Update 2.9.2
+// 
+// Light Source Map was added a Debug mode for Targeted Lighting. This is so you can see what is getting used as lighting information.
+// Change use Transmission from ReVeil to default to "False" also changed Default End toggle = 0x23 from to Delete toggle = 0x2E For the next version of ReShade
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
