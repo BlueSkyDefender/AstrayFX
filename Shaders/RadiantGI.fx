@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 2.9.2
+//For Reshade 3.0+ PCGI Ver 2.9.3
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -246,10 +246,11 @@ uniform float GI_Ray_Length <
 
 uniform float Target_Lighting <
 	ui_type = "slider";
-	ui_min = 0.0; ui_max = 1.0;
-	ui_label = "Target Lighting";
-	ui_tooltip = "Lets you Target the brightest part of the image and use that only for GI.\n"
-			     "Defaults is [0.05] and Zero is off.";
+	ui_min = -1.0; ui_max = 1.0;
+	ui_label = "Targeted Lighting";
+	ui_tooltip = "Lets you target the Direct Lighting and/or Indirect Lighting specifically, so the shader can use your adjustment for its own GI calculations.\n"
+			     "Negative values target Indirect lighting and positive values target direct lighting in the image./n"   
+				 "Defaults is [0.05] and Zero is full image sampling.";
 	ui_category = "PCGI";
 > = 0.05;
 
@@ -272,14 +273,6 @@ uniform float Reflectivness <
 	ui_category = "PCGI";
 > = 1.0;
 
-uniform float Trim <
-	ui_type = "slider";
-	ui_min = 0.0; ui_max = 2.5;
-	ui_label = "Trimming";
-	ui_tooltip = "Trim GI by limiting how far the GI is able to effect the surrounding objects.\n"
-			     "Default is [0.250] and Zero is Off.";
-	ui_category = "PCGI";
-> = 0.25;
 #if PureGI_Mode
 static const bool Scattering = false;
 static const float Wrap = 0.5;
@@ -1028,12 +1021,21 @@ float4 DirectLighting(float2 texcoords , int Mips)
 	float4 BC = BBColor(texcoords, Mips);
 	if(HDR_BP > 0)
 		BC.rgb = inv_Tonemapper(float4(BC.rgb,1-HDR_BP));
-
 	float  GS = Luma(BC.rgb), Boost = 1;
+		if(Target_Lighting >= 0 && !PureGI_Mode)
+		{	
 		   BC.rgb /= GS;
 		   BC.rgb *= saturate(GS - lerp(0.0,0.5,saturate(Target_Lighting)));
 		  if(!PureGI_Mode)
 			Boost = lerp(1,2.5,saturate(Target_Lighting));
+		}
+		else
+		{
+		   BC.rgb /= 1-GS;
+		   BC.rgb *= 1-saturate(GS + lerp(0.0,0.5,saturate(abs(Target_Lighting))));
+		   Boost = lerp(1.0,2.0,saturate(abs(Target_Lighting)));		   		
+		}
+			
 	return float4(Saturator_A(BC.rgb * Boost),BC.a);
 }
 
@@ -1077,7 +1079,7 @@ float SSSMasking(float2 TC)
 //Form Factor Approximations
 float RadianceFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB)
 {   //So normal and the vector between "Element to Element - Radiance Transfer."
-	float4 v = float4(normalize(ddiff), length(ddiff));
+	float4 v = float4(normalize(ddiff), length(ddiff)), Trim = 0.0;
 	//Emitter & Recever
 	float2 giE_R = saturate(float2(dot(-v.xyz,NormalsMap(texcoord+AB,3)), dot( v.xyz, normals )));
 	float Global_Illumination = saturate(100.0 * giE_R.x * giE_R.y /((1000*Trim)*(v.w*v.w)+1.0) );
@@ -1894,5 +1896,9 @@ ui_tooltip = "Beta: Disk-to-Disk Global Illumination Secondary Output.²"; >
 // 
 // Light Source Map was added a Debug mode for Targeted Lighting. This is so you can see what is getting used as lighting information.
 // Change use Transmission from ReVeil to default to "False" also changed Default End toggle = 0x23 from to Delete toggle = 0x2E For the next version of ReShade
+//
+// Sub-Update 2.9.3
+// 
+// Targeted Lighting now allows for Direct Lighting and Indirect Lighitng calibrations.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
