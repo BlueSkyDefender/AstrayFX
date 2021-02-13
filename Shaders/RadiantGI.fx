@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 2.9.3
+//For Reshade 3.0+ PCGI Ver 2.9.4
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -1079,7 +1079,7 @@ float SSSMasking(float2 TC)
 //Form Factor Approximations
 float RadianceFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB)
 {   //So normal and the vector between "Element to Element - Radiance Transfer."
-	float4 v = float4(normalize(ddiff), length(ddiff)), Trim = 0.0;
+	float4 v = float4(normalize(ddiff), length(ddiff)); float Trim = 0.0;
 	//Emitter & Recever
 	float2 giE_R = saturate(float2(dot(-v.xyz,NormalsMap(texcoord+AB,3)), dot( v.xyz, normals )));
 	float Global_Illumination = saturate(100.0 * giE_R.x * giE_R.y /((1000*Trim)*(v.w*v.w)+1.0) );
@@ -1900,5 +1900,9 @@ ui_tooltip = "Beta: Disk-to-Disk Global Illumination Secondary Output.²"; >
 // Sub-Update 2.9.3
 // 
 // Targeted Lighting now allows for Direct Lighting and Indirect Lighitng calibrations.
+//
+// Sub-Update 2.9.4
+// 
+// Fixed a small issue with the shader. Swizzle me this.........
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
