@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 2.9.4
+//For Reshade 3.0+ PCGI Ver 2.9.5
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -139,7 +139,7 @@
 #define MaxDepth_Cutoff 0.999 //[0.1 - 1.0]         Used to cutout the sky with depth buffer masking. This lets the shader save on performance by limiting what is used in GI.
 #define Controlled_Blend 0    //[Off | On]          Use this if you want control over blending GI in to the final
 #define Dark_Mode 0           //[Off | On]          Instead of using a 50% gray it displays Black for the absence of information.
-#define Text_Info_Key 122     //F11 Key             Text Information Key Default 122 is the F11 Key. You can use this site https://keycode.info to pick your own.
+#define Text_Info_Key 93      //Menu Key            Text Information Key Default 122 is the F11 Key. You can use this site https://keycode.info to pick your own.
 #define Disable_Debug_Info 0  //[Off | On]          Use this to disable help information that gives you hints for fixing many games with Overwatch.fxh.
 #define Minimize_Web_Info 0   //[Off | On]          Use this to minimize the website logo on startup.
 #define ForcePool 0           //[Off | On]          Force Pooled Textures in versions 4.9.0+ If you get a black screen turn this too off. Seems to be a ReShade Issue.
@@ -1904,5 +1904,9 @@ ui_tooltip = "Beta: Disk-to-Disk Global Illumination Secondary Output.²"; >
 // Sub-Update 2.9.4
 // 
 // Fixed a small issue with the shader. Swizzle me this.........
+//
+// Sub-Update 2.9.5
+// 
+// Default Key Change for debug menu from F11 to the Menu Key.........
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
