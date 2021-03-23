@@ -3,7 +3,7 @@
  //---------------////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Depth Based Unsharp Mask Bilateral Contrast Adaptive Sharpening
+// Depth Based Unsharp Mask Bilateral Contrast Adaptive Sharpening v2.1
 // For Reshade 3.0+
 //  ---------------------------------
 //								https://web.stanford.edu/class/cs448f/lectures/2.1/Sharpening.pdf
@@ -14,23 +14,6 @@
 //
 //                                     Everyone wants to best the bilateral filter.....
 //
-// 													Multi-licensing
-// LICENSE
-// =======
-// Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All rights reserved.
-// -------
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation
-// files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy,
-// modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following conditions:
-// -------
-// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
-// Software.
-// -------
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-// WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR
-// COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-// ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE
 //
 // LICENSE
 // ============
@@ -98,6 +81,12 @@
 #else
 	#define Compatibility 0
 #endif
+
+//uniform float TEST <
+//	ui_type = "drag";
+//	ui_min = 0.0; ui_max = 10.0;
+//> = 1.0;
+
 
 uniform int Depth_Map <
 	ui_type = "combo";
@@ -336,16 +325,6 @@ float Depth(in float2 texcoord : TEXCOORD0)
 	return saturate(zBuffer);
 }
 
-float Min3(float x, float y, float z)
-{
-    return min(x, min(y, z));
-}
-
-float Max3(float x, float y, float z)
-{
-    return max(x, max(y, z));
-}
-
 float normpdf(in float x, in float sigma)
 {
 	return 0.39894*exp(-0.5*x*x/(sigma*sigma))/sigma;
@@ -390,35 +369,10 @@ float MotionSharpen(float2 texcoord)
 
 float4 CAS(float2 texcoord)
 {
-    float Up, Left, Center, Right, Down, mnRGB, mxRGB;
-
-	// fetch a Cross neighborhood around the pixel 'C',
-	//         Up
-	//
-	//  Left(Center)Right
-	//
-	//        Down
-	if(!CA_Removal)
-	{
-	    Up = LI(BB(texcoord, float2( 0,-pix.y)));
-	    Left = LI(BB(texcoord, float2(-pix.x, 0)));
-	    Center = LI(BB(texcoord, 0));
-	    Right = LI(BB(texcoord, float2( pix.x, 0)));
-		Down = LI(BB(texcoord, float2( 0, pix.y)));
-
-	    mnRGB = Min3( Min3(Left, Center, Right), Up, Down);
-	    mxRGB = Max3( Max3(Left, Center, Right), Up, Down);
-	}
-    // Smooth minimum distance to signal limit divided by smooth max.
-    float rcpMRGB = rcp(mxRGB), RGB_D = saturate(min(mnRGB, 1.0 - mxRGB) * rcpMRGB);
-
-	if( CAM_IOB )
-		RGB_D = saturate(min(mnRGB, 2.0 - mxRGB) * rcpMRGB);
-
 	//Bilateral Filter//                                                Q1         Q2       Q3        Q4
 	const int kSize = MSIZE * 0.5; // Default M-size is Quality 2 so [MSIZE 3] [MSIZE 5] [MSIZE 7] [MSIZE 9] / 2.
 
-	float3 final_colour, c = BB(texcoord.xy,0), cc;
+	float3 final_color, c = BB(texcoord.xy,0), cc;
 	float2 RPC_WS = pix;
 	float bZ = rcp(normpdf(0.0, BSIGMA)), Z, factor;
 	#if B_Accuracy
@@ -441,9 +395,17 @@ float4 CAS(float2 texcoord)
 					factor = normpdf3(cc-c, BSIGMA);
 				#endif
 				Z += factor;
-				final_colour += factor * cc;
+				final_color += factor * cc;
 			}
 	}
+
+	float Mn = min( min( LI(c), LI(final_color/Z)), LI(cc));
+	float Mx = max( max( LI(c), LI(final_color/Z)), LI(cc));
+    // Smooth minimum distance to signal limit divided by smooth max.
+    float rcpMRGB = rcp(Mx), RGB_D = saturate(min(Mn, 1.0 - Mx) * rcpMRGB);
+
+	if( CAM_IOB )
+		RGB_D = saturate(min(Mn, 2.0 - Mx) * rcpMRGB);
 
 	//// Shaping amount of sharpening masked
 	float CAS_Mask = RGB_D, Sharp = Sharpness, MD = MotionSharpen(texcoord);
@@ -457,7 +419,7 @@ float4 CAS(float2 texcoord)
 	if(CA_Removal)
 		CAS_Mask = 1;
 
-return saturate(float4(final_colour/Z,CAS_Mask));
+return saturate(float4(final_color/Z,CAS_Mask));
 }
 
 float4 Sharpen_Out(float2 texcoord)
