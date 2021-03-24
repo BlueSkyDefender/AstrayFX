@@ -3,7 +3,7 @@
  //---------------////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Depth Based Unsharp Mask Bilateral Contrast Adaptive Sharpening v2.1
+// Depth Based Unsharp Mask Bilateral Contrast Adaptive Sharpening v2.2
 // For Reshade 3.0+
 //  ---------------------------------
 //								https://web.stanford.edu/class/cs448f/lectures/2.1/Sharpening.pdf
@@ -82,12 +82,6 @@
 	#define Compatibility 0
 #endif
 
-//uniform float TEST <
-//	ui_type = "drag";
-//	ui_min = 0.0; ui_max = 10.0;
-//> = 1.0;
-
-
 uniform int Depth_Map <
 	ui_type = "combo";
 	ui_items = "Normal\0Reverse\0";
@@ -138,6 +132,7 @@ uniform float Sharpness <
     ui_min = 0.0; ui_max = 2.0;
     ui_tooltip = "Scaled by adjusting this slider from Zero to One to increase sharpness of the image.\n"
 				 "Zero = No Sharpening, to One = Full Sharpening, and Past One = Extra Crispy.\n"
+				 "Number 0.625 is Equal to AMD FidelityFX Contrast Adaptive Sharpening at max settings.\n"
 				 "Number 0.625 is default.";
 	ui_category = "Bilateral CAS";
 > = 0.625;
@@ -232,10 +227,34 @@ uniform int Debug_View <
 	ui_category = "Debug";
 > = 0;
 
+uniform int F_DeNoise <
+	ui_type = "combo";
+	ui_items = "Off\0LVL One DeNoiser\0WIP LVL Two DeNoiser WIP\0";
+	ui_label = "Smart Denoiser Options";
+	ui_tooltip = "This Denoiser can help with Noise in the image.\n"
+				 "LvL One DeNoiser Works with Smart Sharp Only.\n"
+				 "LvL Two DeNoiser Works with other shaders. But, it's stronger....";
+	ui_category = "Extra Menu";
+> = false;
+
+uniform float Denoise_Power <
+	#if Compatibility
+	ui_type = "drag";
+	#else
+	ui_type = "slider";
+	#endif
+    ui_label = "Denoise Power";
+    ui_min = 0.0; ui_max = 1.0;
+    ui_tooltip = "Increase the Sharpening strength of the DeNoiser.\n"
+    			 "At default setting of Zero should be good for DeNoising for default settings.\n"
+				 "Number Zero is default, Off.";
+	ui_category = "Extra Menu";
+> = 0.0;
+
 uniform bool ClampSharp <
 	ui_label = "Clamp Sharpen";
 	ui_tooltip = "This Clamps the output of the Sharpen Shader.";
-	ui_category = "Debug";
+	ui_category = "Extra Menu";
 > = false;
 
 #define Quality 2
@@ -246,6 +265,7 @@ uniform bool ClampSharp <
 #endif
 /////////////////////////////////////////////////////D3D Starts Here/////////////////////////////////////////////////////////////////
 #define pix float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)
+//#define TexSize float2(BUFFER_WIDTH, BUFFER_HEIGHT)
 uniform float timer < source = "timer"; >;
 //Since I don't use this for the incorrect Blur I keep it here for the correct one.
 #define SIGMA 15
@@ -325,6 +345,16 @@ float Depth(in float2 texcoord : TEXCOORD0)
 	return saturate(zBuffer);
 }
 
+float Min3(float x, float y, float z)
+{
+    return min(x, min(y, z));
+}
+
+float Max3(float x, float y, float z)
+{
+    return max(x, max(y, z));
+}
+
 float normpdf(in float x, in float sigma)
 {
 	return 0.39894*exp(-0.5*x*x/(sigma*sigma))/sigma;
@@ -367,10 +397,25 @@ float MotionSharpen(float2 texcoord)
 #endif
 }
 
-float4 CAS(float2 texcoord)
+void Smart_Sharp( float2 texcoord,inout float3 HVB, inout float3 LVB, inout float CAM)
 {
-	//Bilateral Filter//                                                Q1         Q2       Q3        Q4
+	//Bilateral Filter//
 	const int kSize = MSIZE * 0.5; // Default M-size is Quality 2 so [MSIZE 3] [MSIZE 5] [MSIZE 7] [MSIZE 9] / 2.
+	float mnRGB, mxRGB;
+    //float3 Up, Left, Right, Down;
+	// fetch a Cross neighborhood around the pixel 'C',
+	//         Up
+	//
+	//  Left(Center)Right
+	//
+	//        Down
+	//Not Used for CAS or CAM
+    //Up = tex2Dfetch(BackBuffer, texcoord * TexSize + int2( 0,-2)).rgb;
+	//Left = tex2Dfetch(BackBuffer, texcoord * TexSize + int2(-2, 0)).rgb;
+	//Right = tex2Dfetch(BackBuffer, texcoord * TexSize + int2( 2, 0)).rgb;
+	//Down = tex2Dfetch(BackBuffer, texcoord * TexSize + int2( 0, 2)).rgb;
+
+	//Later I will add a 3x3 Medium Filter for LVL Two WIP
 
 	float3 final_color, c = BB(texcoord.xy,0), cc;
 	float2 RPC_WS = pix;
@@ -386,28 +431,31 @@ float4 CAS(float2 texcoord)
 	[loop]
 	for (int i=-kSize; i <= kSize; ++i)
 	{
-			for (int j=-kSize; j <= kSize; ++j)
-			{
-				cc = BB(texcoord.xy, float2(i,j) * RPC_WS * rcp(kSize * GT()) );
-				#if B_Accuracy
-					factor = normpdf3(cc-c, BSIGMA) * bZ * kernal[kSize+j] * kernal[kSize+i];
-				#else
-					factor = normpdf3(cc-c, BSIGMA);
-				#endif
-				Z += factor;
-				final_color += factor * cc;
-			}
+		for (int j=-kSize; j <= kSize; ++j)
+		{
+			cc = BB(texcoord.xy, float2(i,j) * RPC_WS * rcp(kSize * GT()) );
+			#if B_Accuracy
+				factor = normpdf3(cc-c, BSIGMA) * bZ * kernal[kSize+j] * kernal[kSize+i];
+			#else
+				factor = normpdf3(cc-c, BSIGMA);
+			#endif
+			Z += factor;
+			final_color += factor * cc;
+		}
 	}
 
-	float Mn = min( min( LI(c), LI(final_color/Z)), LI(cc));
-	float Mx = max( max( LI(c), LI(final_color/Z)), LI(cc));
-    // Smooth minimum distance to signal limit divided by smooth max.
-    float rcpMRGB = rcp(Mx), RGB_D = saturate(min(Mn, 1.0 - Mx) * rcpMRGB);
+	final_color = final_color/Z;
+
+    mnRGB = min( min( LI(c), LI(final_color)), LI(cc));
+	mxRGB = max( max( LI(c), LI(final_color)), LI(cc));
+
+   // Smooth minimum distance to signal limit divided by smooth max.
+    float rcpMRGB = rcp(mxRGB), RGB_D = saturate(min(mnRGB, 1.0 - mxRGB) * rcpMRGB);
 
 	if( CAM_IOB )
-		RGB_D = saturate(min(Mn, 2.0 - Mx) * rcpMRGB);
+		RGB_D = saturate(min(mnRGB, 2.0 - mxRGB) * rcpMRGB);
 
-	//// Shaping amount of sharpening masked
+	// Shaping amount of sharpening masked
 	float CAS_Mask = RGB_D, Sharp = Sharpness, MD = MotionSharpen(texcoord);
 
 	if(GMD > 0 || Local_Motion)
@@ -419,47 +467,67 @@ float4 CAS(float2 texcoord)
 	if(CA_Removal)
 		CAS_Mask = 1;
 
-return saturate(float4(final_color/Z,CAS_Mask));
+	//High Variance Blur
+	HVB = 0;//(Up + Down + Left + Right ) / 4; // Not Used
+	//Low Variance Blur
+	LVB = final_color;
+	//Contrast Adaptive Masking
+	CAM = CAS_Mask;
+
 }
+
 
 float4 Sharpen_Out(float2 texcoord)
 {
- float Noise, Sharpen_Power = Sharpness, MD = MotionSharpen(texcoord);
+	float Noise, Edge, CAM, Sharpen_Power = Sharpness, MD = MotionSharpen(texcoord);
+	float3 HVB, LVB;
+	float4 color = tex2D(BackBuffer, texcoord),Done;
+
+	Smart_Sharp( texcoord, HVB, LVB, CAM);
 
 	if(GMD > 0 || Local_Motion)
 		Sharpen_Power = Sharpness * lerp( 1,MDSM,saturate(MD));
 
-    float3 Done = tex2D(BackBuffer,texcoord).rgb;
- //   if(CA_Removal || Debug_View || Debug_View == 4 || F_DeNoise)
- //   {   //Noise reduction for pure Bilateral Sharp WIP
- //   	Done /= CAS(texcoord).rgb;
- //   	Noise = min( Min3(Done.r,Done.g,Done.b) * 2 - 1,2-Max3(Done.r,Done.g,Done.b));
- //   	Done = lerp(CAS(texcoord).rgb,tex2D(BackBuffer,texcoord).rgb,saturate(Noise));
- //   }
+    if( F_DeNoise )
+    {   //Noise reduction for pure Bilateral Sharp
+		Done = color;
+    	Done /= LVB;
+    	Done = min( Min3(Done.r,Done.g,Done.b) ,2-Max3(Done.r,Done.g,Done.b));
+		Noise = length(Done > lerp(0.5f,0.95f,Denoise_Power));
+    }
+
     Sharpen_Power *= 3.1;
-	float3 Sharpen = Sharpness >= 0 ? (Done - CAS(texcoord).rgb) * Sharpen_Power : ((Done - CAS(texcoord).rgb) * abs(Sharpen_Power) + 0.5) * 2;
-	
+
+	float3 Sharpen = (tex2D(BackBuffer,texcoord).rgb - LVB) * Sharpen_Power ;
+
 	if (ClampSharp)
-	Sharpen = saturate(Sharpen);//will add a way to clamp it.
-	
-	float Grayscale_Sharpen = dot(Sharpen, 0.333);
-	
+		Sharpen = saturate(Sharpen);
+
+	float Grayscale_Sharpen = LI(Sharpen);
+
 	if (Output_Selection == 0)
 		Sharpen = lerp(Grayscale_Sharpen,Sharpen,0.5);
 	else if (Output_Selection == 1)
 		Sharpen = Sharpen;
 	else
 		Sharpen = Grayscale_Sharpen;
-	
-	if(Sharpness >= 0 )
-		Sharpen += Done;
-	else 
-		Sharpen *= Done;
-		
-    if(Debug_View || Debug_View == 4)
-		return float4(Sharpness >= 0 ? Sharpen - Done : (Sharpen / Done) - 1.0,saturate(Noise)); //Sharpen Debug and Noise
+
+	if( Debug_View == 1)
+	{
+		if( F_DeNoise )
+			Sharpen = lerp( 0 , Sharpen , saturate(Noise ) ) ;
+		else
+			Sharpen = Sharpen;
+	}
 	else
-		return float4(lerp(Done,Sharpen, CAS(texcoord).w * saturate(abs(Sharpen_Power))),1.0); //Sharpen Out
+	{
+		if( F_DeNoise )
+			Sharpen.rgb = lerp(F_DeNoise == 1 ? color.rgb : LVB , tex2D(BackBuffer,texcoord).rgb + Sharpen , saturate(Noise ) ) ;
+		else
+			Sharpen.rgb = color.rgb + Sharpen;
+	}
+
+	return float4(lerp(Debug_View == 1 ? 0 : color.rgb,Sharpen, CAM * saturate(Sharpen_Power)),CAM); //Sharpen Out
 }
 
 
@@ -478,7 +546,7 @@ float3 ShaderOut(float2 texcoord : TEXCOORD0)
 	else if (Debug_View == 2)
 		Out.rgb = lerp(float3(1., 0., 1.),tex2D(BackBuffer,float2(texcoord.x,texcoord.y)).rgb,DB);
 	else if (Debug_View == 3)
-		Out.rgb = lerp(1.0,CAS(float2(texcoord.x,texcoord.y)).www,1-DB);
+		Out.rgb = lerp(1.0,Sharpen_Out(texcoord).www,1-DB);
 	else if (Debug_View == 4)
 		Out.rgb = Sharpen_Out(texcoord).w;
 
