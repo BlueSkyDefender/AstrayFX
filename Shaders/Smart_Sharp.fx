@@ -3,7 +3,7 @@
  //---------------////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Depth Based Unsharp Mask Bilateral Contrast Adaptive Sharpening v2.3
+// Depth Based Unsharp Mask Bilateral Contrast Adaptive Sharpening v2.4
 // For Reshade 3.0+
 //  ---------------------------------
 //								https://web.stanford.edu/class/cs448f/lectures/2.1/Sharpening.pdf
@@ -425,33 +425,17 @@ void Smart_Sharp( float2 texcoord,inout float Edge, inout float3 LVB, inout floa
 {
 	//Bilateral Filter//
 	const int kSize = MSIZE * 0.5; // Default M-size is Quality 2 so [MSIZE 3] [MSIZE 5] [MSIZE 7] [MSIZE 9] / 2.
-	float mnRGB, mxRGB;
-    //float3 Up, Left, Right, Down;
-	// fetch a Cross neighborhood around the pixel 'C',
-	//         Up
-	//
-	//  Left(Center)Right
-	//
-	//        Down
-	//Not Used for CAS or CAM
-    //Up = GetBBfetch(texcoord , int2( 0,-1) ).rgb;
-	//Left = GetBBfetch(texcoord , int2(-1, 0)).rgb;
-	//Right = GetBBfetch(texcoord , int2( 1, 0)).rgb;
-	//Down = GetBBfetch(texcoord , int2( 0, 1)).rgb;
-
-	float t, l, r, s;
-	float2 n; // But, I don't think it's really needed.
+	float mnRGB, mxRGB, t, l, r, s;
+	
 	// Find Edges
 	t = LI(GetBBfetch(texcoord , int2( 0,-2) ).rgb);
-	s = LI(GetBBfetch(texcoord , int2( 0, 1) ).rgb);
+	s = LI(GetBBfetch(texcoord , int2( 0, 2) ).rgb);
 	l = LI(GetBBfetch(texcoord , int2(-2, 0) ).rgb);
 	r = LI(GetBBfetch(texcoord , int2( 2, 0) ).rgb);
-    n = float2(t - s,-(r - l));
-	// I should have made rep adjustable. But, I didn't see the need.
-	// Since my goal was to make this AA fast cheap and simple.
-  float nl = length(n);
+    float2 n = float2(t - s,-(r - l));
+    float nl = length(n);
 
-	//Later I will add a 3x3 Medium Filter for LVL Two WIP
+	//Later I will add a 3x3 Medium Filter for LVL Three WIP
 
 	float3 final_color, c = BB(texcoord.xy,0), cc;
 	float2 RPC_WS = pix;
@@ -503,7 +487,7 @@ void Smart_Sharp( float2 texcoord,inout float Edge, inout float3 LVB, inout floa
 	if(CA_Removal)
 		CAS_Mask = 1;
 
-	//High Variance Blur
+	//Edge Detection
 	Edge = nl;
 	//Low Variance Blur
 	LVB = final_color;
@@ -562,17 +546,14 @@ float4 Sharpen_Out(float2 texcoord)
 	{
 		if( F_DeNoise )
 		{
-		float3 C = F_DeNoise == 1 ? color.rgb : LVB, S  =  tex2D(BackBuffer,texcoord).rgb + Sharpen;
+		float3 C = F_DeNoise == 1 ? color.rgb : LVB, S = color.rgb + Sharpen;
 
-			   C = RGBtoYCoCg(C);
+			   C = RGBtoYCoCg(C); S = RGBtoYCoCg(S);
 
-			   S = RGBtoYCoCg(S);
-
-		C.x = lerp( C.x , S.x ,  Noise  );
-		C.yz = lerp( Debug_View == 4 ? 1 : C.yz , S.yz , Noise );
+			   C.x = lerp( C.x , S.x ,  Noise  );
+			   C.yz = lerp( Debug_View == 4 ? 1 : C.yz , S.yz , Noise );
 
 			Sharpen.rgb = YCoCgtoRGB(lerp( C , S, Edge )) ;
-
 		}
 		else
 			Sharpen.rgb = color.rgb + Sharpen;
