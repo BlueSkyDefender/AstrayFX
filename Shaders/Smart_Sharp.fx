@@ -351,19 +351,24 @@ float Depth(in float2 texcoord : TEXCOORD0)
 	return saturate(zBuffer);
 }
 
-float3 RGBtoYCoCg(float3 c)//YCoCg seems to work better then YCbCr but need more bit depth
-{
-	return float3( c.r/4.0 + c.g/2.0 + c.b/4.0,
-				   c.r/2.0 - c.b/2.0,
-				  -c.r/4.0 + c.g/2.0 - c.b/4.0 );
+float3 RGBtoYCbCr(float3 rgb)
+{   float C[1];//The Chronicles of Riddick: Assault on Dark Athena FIX I don't know why it works.......
+	float Y  =  .299 * rgb.x + .587 * rgb.y + .114 * rgb.z; // Luminance
+	float Cb = -.169 * rgb.x - .331 * rgb.y + .500 * rgb.z; // Chrominance Blue
+	float Cr =  .500 * rgb.x - .419 * rgb.y - .081 * rgb.z; // Chrominance Red
+	return float3(Y,Cb + 128./255.,Cr + 128./255.);
 }
 
-float3 YCoCgtoRGB(float3 c)
+float3 YCbCrtoRGB(float3 ycc)
 {
-	return float3( c.x + c.y - c.z,
-				   c.x + c.z,
-				   c.x - c.y - c.z );
+	float3 c = ycc - float3(0., 128./255., 128./255.);
+
+	float R = c.x + 1.400 * c.z;
+	float G = c.x - 0.343 * c.y - 0.711 * c.z;
+	float B = c.x + 1.765 * c.y;
+	return float3(R,G,B);
 }
+
 float Min3(float x, float y, float z)
 {
     return min(x, min(y, z));
@@ -531,29 +536,28 @@ float4 Sharpen_Out(float2 texcoord)
 		Sharpen = Sharpen;
 	else
 		Sharpen = Grayscale_Sharpen;
-
-	Noise = lerp( 1, Noise  , Denoise_Power);
+	float SNoise = Noise;
+	Noise = saturate(lerp( 1, Noise  , Denoise_Power));
 	Edge = saturate(Edge > 0.125);
+
+	Sharpen = lerp( max(0,lerp( 0 , Sharpen , Noise )) , Sharpen, Edge) ;
 
 	if( Debug_View == 1)
 	{
-		if( F_DeNoise )
-			Sharpen = lerp( lerp( 0 , Sharpen , Noise ) , Sharpen, Edge) ;
-		else
 			Sharpen = Sharpen;
 	}
 	else
 	{
 		if( F_DeNoise )
 		{
-		float3 C = F_DeNoise == 1 ? color.rgb : LVB, S = color.rgb + Sharpen;
+		float3 B = LVB, C = F_DeNoise == 1 ? color.rgb : B, S = color.rgb + Sharpen;
 
-			   C = RGBtoYCoCg(C); S = RGBtoYCoCg(S);
-
+			   C = RGBtoYCbCr(C); S = RGBtoYCbCr(S); B = RGBtoYCbCr(B);
+				
 			   C.x = lerp( C.x , S.x ,  Noise  );
-			   C.yz = lerp( Debug_View == 4 ? 1 : C.yz , S.yz , Noise );
+			   C.yz = lerp( Debug_View == 4 ? 1 : B.yz , S.yz , SNoise );
 
-			Sharpen.rgb = YCoCgtoRGB(lerp( C , S, Edge )) ;
+			Sharpen.rgb = YCbCrtoRGB(lerp( C , S, Edge )) ;
 		}
 		else
 			Sharpen.rgb = color.rgb + Sharpen;
