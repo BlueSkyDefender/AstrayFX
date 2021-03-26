@@ -211,9 +211,9 @@ float DepthMap(float2 texcoord : TEXCOORD0)
 	return lerp(saturate(zBuffer),(zBuffer - WA_B / ( 1 - WA_B)) * WA_A,saturate(step(saturate(zBuffer),WeaponHandAdjust.z)));
 }
 
-float DS(float2 texcoord)
+float DS_Info(float2 texcoord)
 {
-  return tex2Dlod(curr_frame, float4(texcoord,0,0.125)).x ;
+  return tex2Dlod(curr_frame, float4(texcoord.xy,0,0.125)).x ;
 }
 
 float4 Flow(float Past, float Current,float Sensitivy)
@@ -260,7 +260,7 @@ float4 MotionFlow(float4 position : SV_Position, float2 texcoord : TEXCOORD) : S
 {
   float Sensitivy = 0.00000001;
 
-  float Current = DS(texcoord).x;
+  float Current = DS_Info(texcoord).x;
   float Past = tex2D(prev_frame ,texcoord).x;
 
   return Flow(Past,Current,Sensitivy);
@@ -268,7 +268,7 @@ float4 MotionFlow(float4 position : SV_Position, float2 texcoord : TEXCOORD) : S
 
 float3 MotionBlur(float2 texcoord)
 {
-    float D_S = Depth_Scaling ? smoothstep(0,1,saturate(1-DS(texcoord).x) * mblurstrength) : mblurstrength * 0.5;
+    float D_S = Depth_Scaling ? smoothstep(0,1,saturate(1-DS_Info(texcoord).x) * mblurstrength) : mblurstrength * 0.5;
     float weight = 1.0, blursamples = Blur_Amount;
     //Direction of blur and assumption that blur should be stronger near the cam.
     float2 uvoffsets = tex2Dlod(Motion_Info,float4(texcoord,0,0)).xy * D_S;
@@ -285,7 +285,7 @@ float3 MotionBlur(float2 texcoord)
     if(Debug == 0)
       return accumulation / weightsum;
     else if(Debug == 1)
-      return DS(texcoord).xxx;
+      return DS_Info(texcoord).xxx;
     else
       return float3(uvoffsets * 0.5 + 0.5,0);
 }
@@ -404,7 +404,7 @@ void CurrentFrame(float4 vpos : SV_Position, float2 texcoord : TEXCOORD, out flo
 
 void PreviousFrame(float4 vpos : SV_Position, float2 texcoord : TEXCOORD, out float prev : SV_Target)
 {
-	prev = DS(texcoord).x;
+	prev = DS_Info(texcoord).x;
 }
 
 ///////////////////////////////////////////////////////////ReShade.fxh/////////////////////////////////////////////////////////////
