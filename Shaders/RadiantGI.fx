@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 2.9.5
+//For Reshade 3.0+ PCGI Ver 2.9.6
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -1258,8 +1258,8 @@ void Upsample(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4
 
 float3 GI(float2 TC, float Mips)
 {
-	#line 1337 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info¿½ï¿½ï¿½ï¿½"
-	#warning ""
+	//#line 1337 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info¿½ï¿½ï¿½ï¿½"
+	//#warning ""
 	float3 GI_Out = tex2Dlod( PCGIupsample_Info, float4( TC, 0, Mips)).xyz * MCNoise( framecount, TC, 0 );
 	return GetPos() ? GI_Out * TC.xyx : GI_Out;
 }   float  Helper() { float Temp_Location = T_01() == 12500 ? 0 : 1 ; return Temp_Location;}
@@ -1270,38 +1270,45 @@ float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Targe
 	//Velocity Scaler
 	float S_Velocity = 12.5 * lerp( 1, 80,TAA_Clamping), V_Buffer = saturate(distance(DepthMap(texcoords, 0),tex2D(PCGIpastFrame,texcoords).w) * S_Velocity);
 	//Accumulation buffer Start
-    float4 PastColor = tex2Dlod( PCGIaccuFrames, float4( texcoords, 0, 0) );
-	float3 GISamples, CurrAOGI = GI( texcoords, 0).rgb;
-
-	float3 antialiased = PastColor.xyz;
-	float mixRate = min( PastColor.w, 0.5), MB = 0.0;//0.001;
-
-	antialiased = lerp( antialiased * antialiased, CurrAOGI.rgb * CurrAOGI.rgb, mixRate);
-	antialiased = sqrt( antialiased);
-
+	float3 GISamples, CurrAOGI = GI( texcoords, 0).rgb, MB = 0;
 	float3 minColor = CurrAOGI - MB;
 	float3 maxColor = CurrAOGI + MB;
 	[unroll]
 	for(int i = 0; i < 8; ++i)
 	{
-		float2 Offset = XYoffset[i] * 4;
+		float2 Offset = XYoffset[i] * 4;//Use this on color image first.
 		GISamples = GI( texcoords + Offset , 0 ).rgb;
 		minColor = min( minColor, GISamples) - MB;
 		maxColor = max( maxColor, GISamples) + MB;
 	}
-	//float3 preclamping = antialiased;
+	//Insert your motion buffer here...... Also leaving this here so when ReShade or a cleaver Dev can make his own.
+	//float2 Motion_Buffer = tex2D(OpticalFlow::sMotion5, texcoords).xy / float2(BUFFER_WIDTH, BUFFER_HEIGHT);
+	
+	float2 PastTexcoords = texcoords;// + Motion_Buffer;
+	// this is done with a ACC Buffer in reshade. But, you may want to create your own PastFrames
 	//Min Max neighbourhood clamping.
-	antialiased = clamp( antialiased, minColor, maxColor);
+	float3 Past = clamp( tex2Dlod( PCGIaccuFrames, float4(PastTexcoords, 0, 0) ).rgb, minColor, maxColor);
+	float mixRate = min( tex2Dlod( PCGIaccuFrames, float4(texcoords, 0, 0) ).w, 0.5);
+	
+	// Simple AB clamping used for mixing 
+	//float2 A = PastTexcoords > 1., B = PastTexcoords < 0.;
+	//TAA Mixing for real motion buffer.......      
+	// float Mixing = any(float2(any(A), any(B))) ? 1 : 0;
+	
 	mixRate = rcp( 1.0 / mixRate + 1.0);
-	//float diff = length(antialiased - preclamping) * 4;
+	//float diff = length(antialiased - preclamping) * 4;//Alternet way of doing it
 	//Added Velocity Clamping.......
 	float clampAmount = V_Buffer;
-
+	
 	mixRate += clampAmount;
 	mixRate = clamp( mixRate, 0.0, 0.5);
+	
+	float Mixing = mixRate;// Use mixRate or AB Clamping for Mixing.....
+	//Simple Blending
+	float3 AA = lerp(Past, CurrAOGI, Mixing );
 	//Sample from Accumulation buffer, with mix rate clamping.
-	float3 AA = lerp( 0, antialiased, D_Similarity);
-	return float4( AA, mixRate);
+	AA = lerp( 0, AA, D_Similarity); 
+	return float4( AA, 1.0);
 }
 //Custom Gaussian Blur Denoiser
 float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
@@ -1908,5 +1915,9 @@ ui_tooltip = "Beta: Disk-to-Disk Global Illumination Secondary Output.Â²"; >
 // Sub-Update 2.9.5
 // 
 // Default Key Change for debug menu from F11 to the Menu Key.........
+//
+// Update 2.9.6
+//
+// Rewrote my TAA implementation so if there is a update for ReShade that can give us real motion buffer It can be easy addition to the current TAA.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
