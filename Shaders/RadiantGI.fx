@@ -139,7 +139,7 @@
 #define MaxDepth_Cutoff 0.999 //[0.1 - 1.0]         Used to cutout the sky with depth buffer masking. This lets the shader save on performance by limiting what is used in GI.
 #define Controlled_Blend 0    //[Off | On]          Use this if you want control over blending GI in to the final
 #define Dark_Mode 0           //[Off | On]          Instead of using a 50% gray it displays Black for the absence of information.
-#define Text_Info_Key 93      //Menu Key            Text Information Key Default 122 is the F11 Key. You can use this site https://keycode.info to pick your own.
+#define Text_Info_Key 93      //Menu Key            Text Information Key Default 93 is the Menu Key. You can use this site https://keycode.info to pick your own.
 #define Disable_Debug_Info 0  //[Off | On]          Use this to disable help information that gives you hints for fixing many games with Overwatch.fxh.
 #define Minimize_Web_Info 0   //[Off | On]          Use this to minimize the website logo on startup.
 #define ForcePool 0           //[Off | On]          Force Pooled Textures in versions 4.9.0+ If you get a black screen turn this too off. Seems to be a ReShade Issue.
@@ -1258,8 +1258,8 @@ void Upsample(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4
 
 float3 GI(float2 TC, float Mips)
 {
-	//#line 1337 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info¿½ï¿½ï¿½ï¿½"
-	//#warning ""
+	#line 1337 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info¿½ï¿½ï¿½ï¿½"
+	#warning ""
 	float3 GI_Out = tex2Dlod( PCGIupsample_Info, float4( TC, 0, Mips)).xyz * MCNoise( framecount, TC, 0 );
 	return GetPos() ? GI_Out * TC.xyx : GI_Out;
 }   float  Helper() { float Temp_Location = T_01() == 12500 ? 0 : 1 ; return Temp_Location;}
