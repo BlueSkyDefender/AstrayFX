@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 2.9.7
+//For Reshade 3.0+ PCGI Ver 2.9.8
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -1437,12 +1437,12 @@ float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
 //Horizontal Denoising Upscaling
 float4 BGU_Hoz(float4 position : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 {   //float AO = Denoise(PCGIupsample_Info,texcoords,SamplesXY, 1, 4).w;
-	return float4( Denoise( BackBufferPCGI          , texcoords, EvenSteven[clamp(SamplesXY,0,20)], 0, 4 ).rgb, 0);
+	return float4( Denoise( BackBufferPCGI          , texcoords, EvenSteven[clamp(SamplesXY,0,20)], 0, 2.5 ).rgb, 0);
 }
 //Vertical Denoising Upscaling
 float4 BGU_Ver(float4 position : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 {
-	return float4( Denoise( PCGI_BGUHorizontal_Sample, texcoords, EvenSteven[clamp(SamplesXY,0,20)], 1, 4).rgb, 0);
+	return float4( Denoise( PCGI_BGUHorizontal_Sample, texcoords, EvenSteven[clamp(SamplesXY,0,20)], 1, 2.5).rgb, 0);
 }
 
 float3 Composite(float3 Color, float3 Cloud)
@@ -2040,5 +2040,9 @@ ui_tooltip = "Beta: Global Illumination Secondary Output.²"; >
 // on to the world based on Direction. I do hope this update make things better to use. I also tried to make SSS easier by automating luminace clipping. 
 //
 // For the next release I will be reworking the Denoiser / TAA 100% Thank you Robloxian AKA Clown Comp AKA Brimsion on GitHubs on the interwebs.
+//
+// Update 2.9.7
+//
+// Mini Update Adjusting the Denoiser so it gives a sharper image out.Thank you Lord of Lunacy.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
