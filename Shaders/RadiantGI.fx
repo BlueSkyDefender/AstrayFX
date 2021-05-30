@@ -1361,7 +1361,7 @@ float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Targe
 {   //Depth Similarity
 	float M_Similarity = 0.5, D_Similarity = saturate(pow(abs(tex2D(PCGIpastFrame,texcoords).w/DepthMap(texcoords, 0).x), 10) + M_Similarity);
 	//Velocity Scaler
-	float S_Velocity = 12.5 * lerp( 1, 80,TAA_Clamping), V_Buffer = saturate(distance(DepthMap(texcoords, 0),tex2D(PCGIpastFrame,texcoords).w) * S_Velocity);
+	//float S_Velocity = 12.5 * lerp( 1, 80,TAA_Clamping), V_Buffer = saturate(abs(DepthMap(texcoords, 0)-tex2D(PCGIpastFrame,texcoords).w )* S_Velocity);
 	//Accumulation buffer Start
 	float3 GISamples, CurrAOGI = GI( texcoords, 0).rgb, MB = 0;
 	float3 minColor = CurrAOGI - MB;
@@ -1391,7 +1391,7 @@ float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Targe
 	mixRate = rcp( 1.0 / mixRate + 1.0);
 	//float diff = length(antialiased - preclamping) * 4;//Alternet way of doing it
 	//Added Velocity Clamping.......
-	float clampAmount = V_Buffer;
+	float clampAmount = 0;//V_Buffer;//For AO But,I Droped this and use MixRate;
 
 	mixRate += clampAmount;
 	mixRate = clamp( mixRate, 0.0, TAA_MMR);
