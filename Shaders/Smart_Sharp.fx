@@ -120,14 +120,6 @@ uniform bool No_Depth_Map <
 	ui_category = "Depth Buffer";
 > = false;
 
-uniform int Output_Selection <
-	ui_type = "combo";
-	ui_items = "Mix\0Color Only\0Greyscale Only\0";
-	ui_label = "Output Selection";
-	ui_tooltip = "Select Sharpen output type.";
-	ui_category = "Bilateral CAS";
-> = 0;
-
 uniform float Sharpness <
 	#if Compatibility
 	ui_type = "drag";
@@ -163,7 +155,7 @@ uniform bool CAM_IOB <
 	ui_tooltip = "Instead of of allowing Overbright in the mask this allows sharpening of this area.\n"
 				 "I think it's more accurate to leave this on.";
 	ui_category = "Bilateral CAS";
-> = true;
+> = false;
 
 uniform bool CA_Mask_Boost <
 	ui_label = "CAM Boost";
@@ -261,7 +253,7 @@ uniform bool ClampSharp <
 	ui_label = "Clamp Sharpen";
 	ui_tooltip = "This Clamps the output of the Sharpen Shader.";
 	ui_category = "Extra Menu";
-> = false;
+> = true;
 
 #define Quality 2
 
@@ -523,11 +515,19 @@ float4 Sharpen_Out(float2 texcoord)
 
     Sharpen_Power *= 3.1;
 
-	float3 Sharpen = (tex2D(BackBuffer,texcoord).rgb - LVB) * Sharpen_Power ;
+	float3 Sharpen;// = (tex2D(BackBuffer,texcoord).rgb - LVB) * Sharpen_Power ;
+
+//RGBtoYCbCr(
+//YCbCrtoRGB(
+Sharpen = RGBtoYCbCr(tex2D(BackBuffer,texcoord).rgb - LVB);
+
+Sharpen.x *= Sharpen_Power; 
+
+Sharpen = YCbCrtoRGB(Sharpen);
 
 	if (ClampSharp)
 		Sharpen = saturate(Sharpen);
-
+/*
 	float Grayscale_Sharpen = LI(Sharpen);
 
 	if (Output_Selection == 0)
@@ -536,6 +536,7 @@ float4 Sharpen_Out(float2 texcoord)
 		Sharpen = Sharpen;
 	else
 		Sharpen = Grayscale_Sharpen;
+*/		
 	float SNoise = Noise;
 	Noise = saturate(lerp( 1, Noise  , Denoise_Power));
 	Edge = saturate(Edge > 0.125);
