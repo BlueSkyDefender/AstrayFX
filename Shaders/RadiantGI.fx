@@ -1290,11 +1290,10 @@ float SSSMasking(float2 TC)
 float RadianceFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB)
 {   //So normal and the vector between "Element to Element - Radiance Transfer."
 	float4 v = float4(normalize(ddiff), length(ddiff));
-	float Mnormals = abs(Reflectivness.x) < 1 ? lerp(3,0,saturate(dot(float3(0,1,0),normals))) : 3, Trimming = 0;//(1000*(1-D_Irradiance)) ;
+	float Mnormals = abs(Reflectivness.x) < 1 ? lerp(3,0,saturate(dot(float3(0,1,0),normals))) : 3;// Trimming = (1000*(1-D_Irradiance)) ;
 	//Emitter & Recever
-	float2 giE_R =  max(float2(   dot(   -v.xyz   ,   NormalsMap(texcoord+AB, Mnormals )    )   ,   dot( v.xyz, normals )   )   ,0);
-	float Global_Illumination = saturate((100.0 * giE_R.x * giE_R.y) / ( Trimming * (v.w*v.w) + PI) );
-	return Global_Illumination;
+	float2 giE_R =  max(float2(   step(   0.0,   dot(   -v.xyz   ,   NormalsMap(texcoord+AB, Mnormals )    )    ),   dot( v.xyz, normals )   )   ,0);
+	return saturate((100.0 * giE_R.x * giE_R.y) / ( (v.w*v.w) + PI) );
 }
 /* //This Code is Disabled Not going to use in RadiantGI
 float AmbientOcclusionFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB)
@@ -1375,7 +1374,7 @@ void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Glo
 			//Recever to Emitter vector
 			ddiff_gi = GetPosition( texcoords + GIWH) - p;
 			//Irradiance Information
-			II_gi = DirectLighting( texcoords + GIWH, 3 ).rgb;
+			II_gi = DirectLighting( texcoords + GIWH, 3 ).rgb * 1.125;
 			//Radiance Form Factor
 			GI.rgb += lerp(II_gi, 0, N_F) * RadianceFF(texcoords, ddiff_gi, n, GIWH);
 		}
@@ -1402,14 +1401,15 @@ void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Glo
 		SubsurfaceScattering.xyzw *= Transmission_Layer;
 	}
 	#endif
-	GlobalIllumination = float4(RGBtoYCbCr( min( 1.0 , GI.rgb * 2.0 ) ), GI.w);
+	GlobalIllumination = float4( min( 1.0 , GI.rgb * 2.0 ) , GI.w);
 	SubsurfaceScattering = min( 1.0 , float4(SS.rgb, SS.w * 2.0));
 }
 
 float4 GI_Adjusted(float2 TC, int Mip)
 {
-	float4 ConvertGI = tex2Dlod( PCGI_Info, float4( TC , 0, Mip)), ConvertSS = tex2Dlod( PCSS_Info, float4( TC , 0, Mip));
-
+	float4 ConvertGI = tex2Dlod( PCGI_Info, float4( TC , 0, Mip)) , ConvertSS = tex2Dlod( PCSS_Info, float4( TC , 0, Mip));
+	
+	ConvertGI.xyz = RGBtoYCbCr(ConvertGI.xyz);
 	ConvertGI.x *= GI_LumaPower.x;
 	ConvertGI.xyz = Saturator_C(YCbCrtoRGB( ConvertGI.xyz));
 
