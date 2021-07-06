@@ -11,10 +11,7 @@ Depth Based Unsharp Mask intentional haloing. This will work with or without dep
 This will enhance Depth Effects that are already apart of the scene. *UPDATE PENDING*
 
 **Temporal AA**<br />
-TAA is a Epic Games implementation of Temporal AA that seems the only real way of doing this in reshade with out motion vectors. *UPDATE PENDING*
-
-**eMotionBLur**<br />
-Fake motion vectors Motion Blur. *UPDATE PENDING*
+TAA is a Epic Games implementation of Temporal AA that seems the only real way of doing this in reshade with out motion vectors.
 
 **Trails**<br />
 This is an echoing based shader to add a trail to your image as you increase the image persistence. Mainly used for light painting.
