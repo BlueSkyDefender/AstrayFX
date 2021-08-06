@@ -29,7 +29,7 @@ A Basic High Bloom mid Perf HDR shader that allows for automatic functions to he
 RadiantGI is an indirect lighting algorithm based on the disk-to-disk radiance transfer. It's simply Radiant................
 
 **GloomAO**<br />
-Info Pending....
+GloomAO is a Screen Space Directional Occlusion based shader that has TAA and basic GI built in.
 
 And many more in the works.
 
