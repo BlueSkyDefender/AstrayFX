@@ -3,7 +3,7 @@
 //-----------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ SSDO Ver 0.1.2
+//For Reshade 3.0+ SSDO Ver 0.1.3
 //-----------------------------
 //                                                                Screen Space Directional Occlusion
 //
@@ -1024,7 +1024,7 @@ float4 SSDOMixing(float2 texcoords )
 													NDSampler(texcoords + float2( pix.x * 2,         0), 1).w +
 													NDSampler(texcoords + float2(-pix.x * 2,         0), 2).w +
 													NDSampler(texcoords + float2( 0        , pix.y * 2), 3).w +
-													NDSampler(texcoords + float2( 0        ,-pix.y * 2), 4).w   ) * 0.2 : 0;
+													NDSampler(texcoords + float2( 0        ,-pix.y * 2), 4).w   ) * 0.2f : 0.00000001f;
 	//Mip Denoiser
 	float3 ssdo = lerp(SSDO_MipBLur( SSDOaccuFrames, texcoords,1),SSDO_MipBLur( SSDOaccuFrames, texcoords,0),NormalMask(texcoords,2));
 
@@ -1042,7 +1042,6 @@ float4 SSDOMixing(float2 texcoords )
 	else
   	  return float4(Depth_Guide ? Layer.rgb * float3((Depth/Guide> 0.998),1,(Depth/Guide > 0.998))  : Layer.rgb,1.0);
 }
-
 ////////////////////////////////////////////////////////////////Overwatch////////////////////////////////////////////////////////////////////////////
 float Text_Switch() { return RH || NC || NP || NF || PE || DS || OS || DA || NW || FV ? 0 : 1; }
 static const float  CH_A    = float(0x69f99), CH_B    = float(0x79797), CH_C    = float(0xe111e),
