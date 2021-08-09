@@ -3,7 +3,7 @@
 //-----------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ SSDO Ver 0.1.1
+//For Reshade 3.0+ SSDO Ver 0.1.2
 //-----------------------------
 //                                                                Screen Space Directional Occlusion
 //
@@ -126,12 +126,12 @@ uniform int GloomAO <
 	ui_label = " ";
 	ui_type = "radio";
 >;
-/*
-uniform float TEST < ui_type = "slider"; ui_min = 0; ui_max = 1; > = 1.0;
-*/
+
+//uniform float TEST < ui_type = "slider"; ui_min = 0; ui_max = 1; > = 1.0;
+
 uniform int SSDO_MipSampling <
 	ui_type = "combo";
-	ui_items = "Full Resolution\0Half Resolution\0Quarter Resolution\0Full Resolution Adptive\0Half Resolution Adaptive\0";
+	ui_items = "Full Resolution\0Half Resolution\0Quarter Resolution\0Full Resolution Adptive\0Half Resolution Adaptive\0Quarter Resolution Adaptive\0";
     ui_label = "Sampling Quality";
     ui_tooltip = "Use this to improve performance by sampling Mipmaps.\n"
 				 "Artifacts are more prominent at lower quality settings.";
@@ -158,7 +158,7 @@ uniform float SSDO_SampleRadius <
 uniform float NCD <
 	ui_type = "slider";
 	ui_min = 0.0; ui_max = 1.0;
-	ui_label = "Near Details";
+	ui_label = "Depth Hands Adjust";
 	ui_tooltip = "Lets you adjust detail of objects near the cam like for the Weapon Hand in game that fall out of range.\n"
 			     "Defaults is [Weapon Hand 0.0]";
 	ui_category = "SSDO";
@@ -406,7 +406,7 @@ sampler SamplerNormalsSSDO
 	Texture = texNormalsSSDO;
 };
 
-texture texColorsSSDO { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA8; MipLevels = 4; };
+texture texColorsSSDO { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA8; MipLevels = 8; };
 
 sampler SamplerColorsSSDO
 {
@@ -695,10 +695,10 @@ float Depth_Info(float2 texcoord)
 	return  saturate( lerp(NCD > 0 ? zBufferWH : zBuffer,zBuffer,0.925) );
 }   int T_02() { return 25000; }
 
-float2 PackNormal(float3 n)
+float2 PackNormals(float3 n)
 {
-    float f = sqrt(8*n.z+8);
-    return n.xy / f + 0.5;
+    float f = rsqrt(8*n.z+8);
+    return n.xy * f + 0.5;
 }
 //PureDepthAO
 void NormalsColorsDepth(float4 vpos : SV_Position, float2 texcoords : TEXCOORD,
@@ -761,12 +761,12 @@ void NormalsColorsDepth(float4 vpos : SV_Position, float2 texcoords : TEXCOORD,
 
 	 Enormal = normalize(lerp(normal,Enormal, distance(Enormal,normal) >= 1.0));
 
-	Normals = PackNormal(Enormal);
+	Normals = PackNormals(Enormal);
 	Colors = float4(tex2D(BackBufferSSDO,texcoords).rgb,1);
 	Depth = depth;
 }
 
-float3 UnpackNormal(float2 enc)
+float3 UnpackNormals(float2 enc)
 {
     float2 fenc = enc*4-2;
     float f = dot(fenc,fenc), g = sqrt(1-f/4);
@@ -781,7 +781,7 @@ float4 NDSampler(float2 TC, float Mip)
 	//float zoom = (0.5 + 0.5 * TEST);
     //float2 scaleCenter = 0.5;
     //float2 uv = (TC - scaleCenter) * zoom + scaleCenter;
-	float3 Norm = UnpackNormal(tex2Dlod(SamplerNormalsSSDO,float4(TC,0,Mip)).xy);
+	float3 Norm = UnpackNormals(tex2Dlod(SamplerNormalsSSDO,float4(TC,0,Mip)).xy);
 	float Depth = tex2Dlod(SamplerDepthSSDO,float4(TC,0,Mip)).x;
 
 	return float4(Norm,Depth);
@@ -795,15 +795,14 @@ float2 Rotate2D( float2 r, float l )
 
 float3 GetPosition(float2 texcoords,float2 raycoords,float Depth, float FDepth)
 {
-	//raycoords.y *= TEST;
 	// Compute Correct Pos
 	return float3(float2(raycoords.x-texcoords.x,texcoords.y-raycoords.y) * (Depth + 0.001), Depth - FDepth);
 }   int nonplus() { return T_01() == 0 || T_02() == 0 ? 1 : 0;}
 
-float4 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
+float3 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 {
 	int SSDO_Samples = clamp(SSDO_Levels,1,64);
-	float DeArtifact = saturate(rcp(64)*SSDO_Samples)*saturate(rcp(3)*SSDO_MipSampling),SSDO_SRM = SSDO_SampleRadius * lerp(1,3,rcp(64)*SSDO_Samples),
+	float SSDO_SRM = SSDO_SampleRadius * lerp(1,3,rcp(64)*SSDO_Samples),
 		  SSDO_Contribution_Range = SSDO_SRM*pix.x*max(SSDO_Trimming,0.001);//simple scale for aka "Zthiccness."
 	const float ATTF = 1e-5; // attenuation factor
 	float3 Noise, random;// Access Noise
@@ -812,16 +811,16 @@ float4 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 		   Noise.z = MCNoise( texcoords , 1, 3 );
 	// Use Random Noise
 		   random = normalize(Noise);
-	float ILuma = Luma(tex2Dlod(SamplerColorsSSDO,float4(texcoords,0,3)).xyz) * 0.5;
+	float ILuma = Luma(tex2Dlod(SamplerColorsSSDO,float4(texcoords,0,6)).xyz) * 2.0;
 	float4 SSDO, Normals_Depth = NDSampler(texcoords, 0);
 
 	float D0 = smoothstep(-1.0,1.0,Normals_Depth.w),D_Fade = SSDO_Fade > 0 ? lerp(1-SSDO_Fade * 2,0, 1-Normals_Depth.w ) : smoothstep(0,abs(SSDO_Fade),Normals_Depth.w);
-	//i = lerp(2.0,16,DeArtifact)
+	int Mip_Switch = SSDO_MipSampling == 4 || SSDO_MipSampling == 5 ? 1 : 0;
 	//[fastop]
 	for (int i = 1.0; i <= SSDO_Samples; i++)
 	{   //Ref said to use continue.... But, better perf with discard.
-		//if(texcoords.x >= 1 || texcoords.y >= 1)
-			//discard;
+		if(texcoords.x >= 1 || texcoords.y >= 1)
+			discard;
 
 		if(Normals_Depth.w > SSDO_Max_Depth)
 			continue;
@@ -830,7 +829,7 @@ float4 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 		float2 RayDir = (pix * (SSDO_SRM/SSDO_Samples)) * gNoise( 1, vpos.xy) * Rotate2D( POISSON_SAMPLES[i], random.x ) / D0; // tossed out reflect(coord,random) Because Sampled Mips didn't work with the code above.... May need Yakube to fix this.
 
 		float2 RayCoords = texcoords + RayDir.xy;
-		int Adaptive_Mipping = SSDO_MipSampling <= 2 ? SSDO_MipSampling : lerp(2,SSDO_MipSampling == 4 ? 1 : 0,Normals_Depth.w);
+		int Adaptive_Mipping = SSDO_MipSampling <= 2 ? SSDO_MipSampling : lerp(SSDO_MipSampling == 5 ? 3 : 2, Mip_Switch ? 1 : 0, Normals_Depth.w);
 		float4 vsFetch = NDSampler(RayCoords,Adaptive_Mipping) ;
 
 		float3 LocalGI = tex2Dlod(SamplerColorsSSDO,float4(RayCoords,0,3)).xyz ;
@@ -858,8 +857,7 @@ float4 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 	}
 
 	SSDO /= SSDO_Samples;
-	SSDO = saturate(1.0-SSDO);
-		return SSDO;
+	return saturate(1.0-SSDO.rgb);
 }
 
 float NormalMask(float2 texcoords,float Mip)
@@ -1028,7 +1026,7 @@ float4 SSDOMixing(float2 texcoords )
 													NDSampler(texcoords + float2( 0        , pix.y * 2), 3).w +
 													NDSampler(texcoords + float2( 0        ,-pix.y * 2), 4).w   ) * 0.2 : 0;
 	//Mip Denoiser
-	float3 ssdo = lerp(SSDO_MipBLur( SSDOaccuFrames, texcoords,2),SSDO_MipBLur( SSDOaccuFrames, texcoords,0),NormalMask(texcoords,2));
+	float3 ssdo = lerp(SSDO_MipBLur( SSDOaccuFrames, texcoords,1),SSDO_MipBLur( SSDOaccuFrames, texcoords,0),NormalMask(texcoords,2));
 
 	if(smoothstep(0,1,Depth) > SSDO_Max_Depth)
 		ssdo = 1;
