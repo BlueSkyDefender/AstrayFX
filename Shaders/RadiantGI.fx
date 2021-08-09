@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 2.9.8
+//For Reshade 3.0+ PCGI Ver 2.9.9
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -153,6 +153,12 @@
 	#define MaxDepth_CutOff 0.999 //[0.1 - 1.0]     Used to cutout the sky with depth buffer masking. This lets the shader save on performance by limiting what is used in GI.
 #endif
 
+//RadiantGI In menu Options
+#ifndef Simple_Mode
+	#define Simple_Mode 1         //[0 - 1]         Used this to enable or disable Simple User Mode.
+#endif
+#define Simp_Mode Simple_Mode
+
 //Keep in mind you are not licenced to redistribute this shader with setting modified below. Please Read the Licence.
 //This GI shader is free and shouldn't sit behind a paywall. If you paid for this shader ask for a refund right away.
 
@@ -228,15 +234,13 @@ static const float ig = 1.0;                 //LUT Gamma Adjustment 0.05 - 10.0
 #else
 	#define PoolTex
 #endif
-//ReVeil Intragration
-#if exists "ReVeil.fx"
-	#define Look_For_Buffers_ReVeil 1
-#if __RESHADE__ <= 40700 //Needed to do this Because how the warning system in reshade changed from under me. :( Wish the Shader name didn't change to yellow.:(
-	#warning "ReVeil.fx Detected! Yoink! Took your Transmission Buffer"
-#endif
+//Older ReShade Compatibility
+#if __RESHADE__ >= 40300
+	#define Compatibility_TF 1
 #else
-	#define Look_For_Buffers_ReVeil 0
+	#define Compatibility_TF 0
 #endif
+
 //This GI shader is free and shouldn't sit behind a paywall. If you paid for this shader ask for a refund right away.
 //Automatic Adjustment based on Resolutionsup to 4k considered. LOL good luck with 8k in 2020
 #if (BUFFER_HEIGHT <= 720)
@@ -250,6 +254,7 @@ static const float ig = 1.0;                 //LUT Gamma Adjustment 0.05 - 10.0
 #else
 	#define RSRes 0.5 //??? 8k Mystery meat
 #endif
+
 //Help / Guide Information stub uniform a idea from LucasM
 uniform int RadiantGI <
 	ui_text = "RadiantGI is an indirect lighting algorithm based on the disk-to-disk radiance transfer by Michael Bunnell.\n"
@@ -558,14 +563,6 @@ uniform int SamplesXY <
 				 "Default is 7 and you can override this a bit.";
 	ui_category = "Extra Options";
 > = 7;
-
-#if Look_For_Buffers_ReVeil
-	uniform bool UseReVeil<
-		ui_label = "Use Transmission from ReVeil";
-		ui_tooltip = "Requires ReVeil to be enabled (Lord of Lunacy waz here)";
-		ui_category = "Extra Options";
-	> = false;
-#endif
 #if DB_Size_Position || SP == 2
 uniform float2 Horizontal_and_Vertical <
 	ui_type = "drag";
@@ -772,20 +769,15 @@ float3 YCbCrtoRGB(float3 ycc)
 	float B = c.x + 1.765 * c.y;
 	return float3(R,G,B);
 }
-
 //----------------------------------Inverse ToneMappers--------------------------------------------
 float Luma(float3 C)
 {
 	float3 Luma;
 
 	if (HDR_Toggle == 0)
-	{
 		Luma = float3(0.2126, 0.7152, 0.0722); // (HD video) https://en.wikipedia.org/wiki/Luma_(video)
-	}
 	else
-	{
 		Luma = float3(0.2627, 0.6780, 0.0593); // (HDR video) https://en.wikipedia.org/wiki/Rec._2100
-	}
 
 	return dot(C,Luma);
 }
@@ -980,6 +972,11 @@ float  SkinDetection(float4 color)
 	#endif
 } int T_02() { return 25000; }
 /////////////////////////////////////////////////////Texture Samplers////////////////////////////////////////////////////////////////
+#if Compatibility_TF
+	#define RGBAC RGB10A2
+#else
+	#define RGBAC RGBA8
+#endif
 texture DepthBufferTex : DEPTH;
 
 sampler ZBuffer
@@ -994,59 +991,52 @@ sampler BackBufferPCGI
 		Texture = BackBufferTex;
 	};
 
-texture2D PCGIpastTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 5;};
+texture2D PCGIpastTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = R16f; MipLevels = 5;}; //Has to 16bit min
 sampler2D PCGIpastFrame { Texture = PCGIpastTex;
 	MagFilter = POINT;
 	MinFilter = POINT;
 	MipFilter = POINT;
 };
 
-texture2D PCGIaccuTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
+texture2D PCGIaccuTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT ; Format = RGBAC; };
 sampler2D PCGIaccuFrames { Texture = PCGIaccuTex; };
 //Seen issues with pooling this texture.. Workaround for 4.8.0-
-texture2D PCGIcurrColorTex PoolTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;};
+texture2D PCGIcurrColorTex PoolTex { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;}; //Cant use RGB10A2 // must be RGBA8 or RGBA16f since I store information on A
 sampler2D PCGIcurrColor { Texture = PCGIcurrColorTex; };
 
 texture2D PCGIcurrNormalsDepthTex < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16f; MipLevels = 11;};
 sampler2D PCGIcurrNormalsDepth { Texture = PCGIcurrNormalsDepthTex; };
 
-texture2D RadiantGITex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f; };//For AO this need to be RGBA16f or RGBA8
+texture2D RadiantGITex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBAC; };
 sampler2D PCGI_Info { Texture = RadiantGITex;
 	MagFilter = POINT;
 	MinFilter = POINT;
 	MipFilter = POINT;
 };
 
-texture2D RadiantSSTex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f;};//For AO this need to be RGBA16f or RGBA8
+texture2D RadiantSSTex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f;};
 sampler2D PCSS_Info { Texture = RadiantSSTex;
 	MagFilter = POINT;
 	MinFilter = POINT;
 	MipFilter = POINT;
 };
 
-texture2D PCGIReconstructionTex < pooled = true; > { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f; MipLevels = 8;};//For AO this need to be RGBA16f or RGBA8
+texture2D PCGIReconstructionTex < pooled = true; > { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBAC; MipLevels = 8;};
 sampler2D PCGIReconstruction_Info { Texture = PCGIReconstructionTex;
 	MagFilter = POINT;
 	MinFilter = POINT;
 	MipFilter = POINT;
 };
-texture2D PCGIbackbufferTex < pooled = true; > { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f;  };
-sampler2D PCGIbackbuffer_Info { Texture = PCGIbackbufferTex; };
 //Seen issues with pooling this texture.. Workaround for 4.8.0-
-texture2D PCGIHorizontalTex PoolTex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
+texture2D PCGIHorizontalTex PoolTex { Width = BUFFER_WIDTH / 2; Height = BUFFER_HEIGHT / 2; Format = RGBAC; };
 sampler2D PCGI_BGUHorizontal_Sample { Texture = PCGIHorizontalTex;};
 //Seen issues with pooling this texture.. Workaround for 4.8.0-
-texture2D PCGIVerticalTex PoolTex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBA16f; };
+texture2D PCGIVerticalTex PoolTex { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT ; Format = RGBAC; };
 sampler2D PCGI_BGUVertical_Sample { Texture = PCGIVerticalTex;
 };
 
 //texture2D StorageTex < pooled = true; > { Width = 256 ; Height = 256 ; Format = R8;  };
 //sampler2D Storage { Texture = StroageTex; };
-
-#if Look_For_Buffers_ReVeil
-texture Transmission { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = R16f; };
-sampler2D ReVeilTransmission {Texture = Transmission;};
-#endif
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 float Depth_Info(float2 texcoord)
 {
@@ -1144,6 +1134,27 @@ float3 DepthNormals(float2 texcoord)
 	return normalize(cross(P2 - P0, P1 - P0));
 }
 
+float3 UnpackNormals(float2 enc)
+{
+    float2 fenc = enc*4-2;
+    float f = dot(fenc,fenc), g = sqrt(1-f/4);
+    float3 n;
+    n.xy = fenc*g;
+    n.z = 1-f/2;
+    return n;
+}
+
+float4 Normals_Depth(float2 texcoords, float Mips)
+{	
+	float Depth = tex2Dlod(PCGIcurrNormalsDepth,float4(texcoords,0,Mips)).z;
+	float3 Normals = UnpackNormals(tex2Dlod(PCGIcurrNormalsDepth,float4(texcoords,0,Mips)).xy);
+	return float4(Normals,Depth);
+}
+
+float DepthMDC(float2 texcoords, float Mips)
+{
+	return smoothstep(0,1,Normals_Depth(texcoords, Mips).w) > MaxDepth_CutOff;
+}
 /////////////////////////////////////////////////////Blur Shaders////////////////////////////////////////////////////////////////
 //Unlimited Blur
 float2 Vogel2D(int uIndex, int nTaps, float phi)
@@ -1157,19 +1168,19 @@ float2 Vogel2D(int uIndex, int nTaps, float phi)
     return r * sc.yx;
 }
 
-float4 Ublur(sampler2D Tex,in float2 TC,int Mip, float Radius)
+float3 Ublur(sampler2D Tex,in float2 TC,int Mip, float Radius)
 {
     const int uTaps = 8;//went from 16 to 8 saves a little
     //float uBoard = fmod(dot(pos, 1.0), 2.0);
     float2 ps = pix * Radius;
     float urand = MCNoise( 1, TC, 1 ) * (PI*2);//nrand(pos * uBoard) * (PI*2);
-    float4 uImage;
+    float3 uImage;
 
     [fastopt]
     for (int i = 0; i < uTaps; i++)
     {
         float2 ofs = Vogel2D(i, uTaps, urand);
-        float4 uColor = tex2Dlod(Tex,float4(TC + ofs * ps,0,Mip)).rgba;
+        float3 uColor = tex2Dlod(Tex,float4(TC + ofs * ps,0,Mip)).rgb;
         uImage = lerp(uImage, uColor, rcp(i + 1));
     }
 
@@ -1178,10 +1189,10 @@ float4 Ublur(sampler2D Tex,in float2 TC,int Mip, float Radius)
 //Custom Edge Avoiding Gaussian Denoiser
 float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
 {
-	float4 StoredNormals_Depth = tex2Dlod( PCGIcurrNormalsDepth,float4( texcoords, 0, 0));
+	float4 StoredNormals_Depth = Normals_Depth( texcoords, 0);
 	float4 center = tex2D(Tex,texcoords), color = 0.0;//Like why do SmoothNormals when 2nd Level Denoiser is like Got you B#*@!........
 	float total = 0.0, NormalBlurFactor = Debug == 1 ? 0.25f : 1.0f, DepthBlurFactor = 0.011f,  DM = smoothstep(0,1,StoredNormals_Depth.w) > MaxDepth_CutOff;
-	R += 1-tex2Dlod(PCGIbackbuffer_Info,float4(texcoords,0,0)).w ;
+	R += 1-tex2Dlod( PCGIcurrNormalsDepth,float4(texcoords,0,0)).w ;
 	#if VRS_MAP
 		R += useVRS(texcoords, 1);
 	#endif
@@ -1191,7 +1202,7 @@ float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
 		{
         	float2 D = Dir ? float2( i, 0) : float2( 0, i), TC = texcoords + D * R * pix;
 
-			float4 ModifiedNormals_Depth = tex2Dlod( PCGIcurrNormalsDepth, float4( TC, 0, 2));//Use lower mip level here on finnished product.
+			float4 ModifiedNormals_Depth = Normals_Depth( TC, 2);//Use lower mip level here on finnished product.
 			float ModN = length(StoredNormals_Depth.xyz - ModifiedNormals_Depth.xyz), ModD = saturate( StoredNormals_Depth.w - ModifiedNormals_Depth.w);
 
 			float D_Dist2 = max(ModD, 0.0), d_w = min(exp(-(D_Dist2)/DepthBlurFactor), 1.0);
@@ -1209,29 +1220,18 @@ float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
 }
 //Diffusion Blur not moved here.... will do this some other time.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-float2 DepthMap(float2 texcoords, int Mips)
-{   float D = tex2Dlod(PCGIcurrNormalsDepth,float4(texcoords,0,Mips)).w;
-	return float2(D , smoothstep(0,1,D) > MaxDepth_CutOff);
-}
-
-float3 NormalsMap(float2 texcoords, int Mips)
-{//normalize(
-	float3 BN = tex2Dlod(PCGIcurrNormalsDepth,float4(texcoords,0,Mips)).xyz;// * 2.0 - 1.0);
-		   //BN.xy = (BN.xy - 0 ) / (0.625 - 0);//Not Needed oh well stored code.
-	return BN;
-}
 
 float4 BBColor(float2 texcoords, int Mips)
 {   float LL_Comp = 0.5; //Wanted to automate this but it's really not need.
 	float4 BBC = tex2Dlod(PCGIcurrColor,float4(texcoords,0,Mips)).rgba;//PrepColor(texcoords, 0, Mips);
-	BBC.rgb = Sky_Contribution ? BBC.rgb : BBC.rgb * (1-DepthMap(texcoords, 0).y);
+	BBC.rgb = Sky_Contribution ? BBC.rgb : BBC.rgb * ( 1-DepthMDC(texcoords, 0) );
 	//	BBC.rgb = (BBC.rgb - 0.5) * (LL_Comp + 1.0) + 0.5;
 	//	return BBC + (LL_Comp * 0.5625);
 	return BBC;
 }
 
 float4 DirectLighting(float2 texcoords , int Mips)
-{   float MDC = DepthMap(texcoords, 0).y, Sky_Quality = lerp(Mips,SkyMipLeves[min(6,Sky_Adustment)],MDC);	
+{   float MDC = DepthMDC(texcoords, 0), Sky_Quality = lerp(Mips,SkyMipLeves[min(6,Sky_Adustment)],MDC);	
 	float4 BC = BBColor(texcoords, Sky_Quality);
 	if(HDR_BP > 0)
 		BC.rgb = inv_Tonemapper(float4(BC.rgb,1-HDR_BP));
@@ -1250,12 +1250,12 @@ float4 DirectLighting(float2 texcoords , int Mips)
 			
 		   Boost = lerp(1.0,2.5,saturate(abs(Target_Lighting)));
 	
-	return float4(Saturator_A(BC.rgb * Boost, DepthMap(texcoords, 0).y , DepthMap(texcoords, 0).x),BC.a);
+	return float4(Saturator_A(BC.rgb * Boost, DepthMDC(texcoords, 0) , Normals_Depth(texcoords, 0).w),BC.a);
 }
 
 float3 GetPosition(float2 texcoord)
 {
-	float3 DM = -DepthMap(texcoord, 0 ).xxx;
+	float3 DM = -Normals_Depth(texcoord, 0 ).www;
 	return float3(texcoord.xy*2-1,1.0)*DM;
 } float GetPos() { float Postional_Information = T_02() == 25000 ? 0 : 1 ; return Postional_Information;}
 
@@ -1268,7 +1268,7 @@ float2 MultiPattern(float2 TC)
 }
 
 float2 Rotate2D_A( float2 r, float l , float2 TC)
-{   float Reflective_Diffusion = lerp(saturate(abs(Reflectivness.x)),1.0,smoothstep(0,0.25,1-dot(float3(0,1,0) ,NormalsMap(TC,0))));
+{   float Reflective_Diffusion = lerp(saturate(abs(Reflectivness.x)),1.0,smoothstep(0,0.25,1-dot(float3(0,1,0) ,Normals_Depth(TC,0).xyz)));
 	float2 Directions;
 	sincos(l,Directions[0],Directions[1]);//same as float2(cos(l),sin(l))
 	Reflective_Diffusion = Reflectivness.x < 0 ? Reflective_Diffusion : MultiPattern(TC.xy * GI_Res).y ? 1 : Reflective_Diffusion;
@@ -1283,8 +1283,8 @@ float2 Rotate2D_B( float2 r, float l )
 
 float SSSMasking(float2 TC)
 {
-	float SSSD = lerp(0,1, saturate(1-DepthMap(TC, 0 ).x * lerp(1,10,SSS_Seek.x)) );
-	return SSSD * smoothstep(0,0.25,1-dot(float3(0,1,0) ,NormalsMap(TC,0)) * saturate(dot(float3(0,1,0) ,NormalsMap(TC,0))) );// || dot(float3(0,1,0) ,NormalsMap(TC,0))
+	float SSSD = lerp(0,1, saturate(1-Normals_Depth(TC, 0 ).w * lerp(1,10,SSS_Seek.x)) );
+	return SSSD * smoothstep(0,0.25,1-dot(float3(0,1,0) ,Normals_Depth(TC,0).xyz) * saturate(dot(float3(0,1,0) ,Normals_Depth(TC,0).xyz)) );// || dot(float3(0,1,0) ,NormalsMap(TC,0))
 }
 //Form Factor Approximations
 float RadianceFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB)
@@ -1292,7 +1292,7 @@ float RadianceFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2
 	float4 v = float4(normalize(ddiff), length(ddiff));
 	float Mnormals = abs(Reflectivness.x) < 1 ? lerp(3,0,saturate(dot(float3(0,1,0),normals))) : 3;// Trimming = (1000*(1-D_Irradiance)) ;
 	//Emitter & Recever
-	float2 giE_R =  max(float2(   step(   0.0,   dot(   -v.xyz   ,   NormalsMap(texcoord+AB, Mnormals )    )    ),   dot( v.xyz, normals )   )   ,0);
+	float2 giE_R =  max(float2(   step(   0.0,   dot(   -v.xyz   ,   Normals_Depth(texcoord+AB, Mnormals ).xyz    )    ),   dot( v.xyz, normals )   )   ,0);
 	return saturate((100.0 * giE_R.x * giE_R.y) / ( (v.w*v.w) + PI) );
 }
 /* //This Code is Disabled Not going to use in RadiantGI
@@ -1318,7 +1318,7 @@ float SubsurfaceScatteringFF(in float2 texcoord,in float3 ddiff,in float3 normal
 {   //So normal and the vector between "Element to Element - Wrap Lighting."
 	float4 v = float4(normalize(ddiff), length(ddiff));
 	float LW = Wrap; //Emitter & Recever
-	float2 ssE_R = saturate(float2(max(0, dot(-v.xyz,NormalsMap(texcoord+AB,0))), max(0, dot( v.xyz, normals ) + LW) / (1 + LW)));
+	float2 ssE_R = saturate(float2(max(0, dot(-v.xyz,Normals_Depth(texcoord+AB,0).xyz)), max(0, dot( v.xyz, normals ) + LW) / (1 + LW)));
 	float Scatter = saturate(100.0 * ssE_R.x * ssE_R.y / ( PI * v.w * v.w + 1.0) );
 	return Scatter;
 }
@@ -1327,28 +1327,28 @@ float ThiccnessFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float
 {   //So normal and the vector between "Element to Element - Thiccness Approximation."
 	float4 v = float4(normalize(ddiff), length(ddiff));
 	//Emitter & Recever
-	float2 fE_R = float2(1.0 - dot(-NormalsMap(texcoord+AB, 1),v.xyz),  dot( normals, -v.xyz ) ); //flipped face is needed for generate local thiccness map.
+	float2 fE_R = float2(1.0 - dot(-Normals_Depth(texcoord+AB, 1).xyz,v.xyz),  dot( normals, -v.xyz ) ); //flipped face is needed for generate local thiccness map.
 	float Thicc = min(1.0,fE_R.x * fE_R.y * (1.0 - 1.0 / sqrt(rcp(v.w*v.w) + PI)));
 	return Thicc;
 }   int nonplus() { return T_01() == 0 || T_02() == 0 ? 1 : 0;}
 
 void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 GlobalIllumination : SV_Target0, out float4 SubsurfaceScattering : SV_Target1)
 {   float2 stexcoords = texcoords;
-	texcoords /= GI_Res; int Samples = lerp(samples,4,1-tex2Dlod(PCGIbackbuffer_Info,float4(texcoords,0,0)).w );
+	texcoords /= GI_Res; int Samples = lerp(samples,4,1-tex2Dlod( PCGIcurrNormalsDepth,float4(texcoords,0,0)).w );
 	#if VRS_MAP
 		Samples = lerp(Samples,4,useVRS(texcoords, 1));
 	#endif
 	//Global Illumination Ray Length & Depth // * 0.125
-	float depth = DepthMap( texcoords, 0 ).x, D = depth;// * 0.9992;
+	float depth = Normals_Depth( texcoords, 0 ).w, D = depth;// * 0.9992;
 	float4 Noise = float4( MCNoise( framecount, stexcoords, 1 ), MCNoise( framecount, stexcoords, 2 ), MCNoise( framecount, stexcoords, 3 ), MCNoise( framecount, stexcoords, 4 ));	//Smoothing for AO not needed since this shader not going to use AO code above.//for GetPos * 0.990
 	float4 random = normalize(Noise.xyzw * 2 - 1), GI, SS, PWH;//!Smooth ? 0 : 9 // sn = lerp(NormalsMap(texcoords,0),lerp(NormalsMap(texcoords,0),NormalsMap(texcoords,9),lerp(1.0,0.5,D)),0.9)
-	float3 n = NormalsMap( texcoords,0), p = GetPosition( texcoords) * 0.990, ddiff, ddiff_tc, ddiff_gi ,ddiff_gd, ddiff_ss, II_gi, II_gd, II_ss;
+	float3 n = Normals_Depth( texcoords,0).xyz, p = GetPosition( texcoords) * 0.990, ddiff, ddiff_tc, ddiff_gi ,ddiff_gd, ddiff_ss, II_gi, II_gd, II_ss;
 	float4 rl_gi_sss = float4( GIRL().x, GIRL().y, 75,lerp(1,125, Deep_Scattering ));
 	//CheckerBoard Pattern Grab to save Perf
 	float CB0 = MultiPattern( stexcoords.xy ).x, CB1 = Scattering ? CB0 || SkinDetection(tex2Dlod(PCGIcurrColor,float4(texcoords,0,2))) : 1; //|| SkinDetection(tex2D(BackBufferPCGI,texcoords))
 	//Interlaced Scaling
 	rl_gi_sss.xy *= MultiPattern(stexcoords.xy).y ? 0.75 : 0.375 ; //In hear for keeping the look of 2.9.6
-	float MaskDir = saturate( dot(float3(0,1,0),NormalsMap(texcoords, 0)) ), Diffusion = lerp(1.0,lerp(1+Reflectivness.y,1.0,abs(Reflectivness.x)), MaskDir );
+	float MaskDir = saturate( dot(float3(0,1,0),Normals_Depth(texcoords, 0).xyz) ), Diffusion = lerp(1.0,lerp(1+Reflectivness.y,1.0,abs(Reflectivness.x)), MaskDir );
 	rl_gi_sss.xy *= Reflectivness.x < 0 ? Diffusion : MultiPattern(stexcoords.xy).y ? 1 : Diffusion;
 	//Basic depth rescaling from Near to Far 
 	float D0 = smoothstep(-NCD.x,1, depth ), D1 = smoothstep(-1,1, depth ), N_F = lerp(GI_Fade * 2,0, 1-D );//smoothstep(0,saturate(GI_Fade),D);
@@ -1392,15 +1392,6 @@ void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Glo
 	float Samp = rcp(Samples);
 	GI *= Samp; SS *= Samp;
 
-
-	#if Look_For_Buffers_ReVeil //Lord of Lunacy DeHaze insertion was here.
-	float Transmission_Layer = tex2D( ReVeilTransmission, texcoords).r;
-	if(UseReVeil)
-	{
-		GlobalIllumination.xyzw *= Transmission_Layer;
-		SubsurfaceScattering.xyzw *= Transmission_Layer;
-	}
-	#endif
 	GlobalIllumination = float4( min( 1.0 , GI.rgb * 2.0 ) , GI.w);
 	SubsurfaceScattering = min( 1.0 , float4(SS.rgb, SS.w * 2.0));
 }
@@ -1421,7 +1412,7 @@ float4 GI_Adjusted(float2 TC, int Mip)
 	return float4( ConvertGI.xyz , 0) ;
 }
 
-void CBReconstruction(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 UpGI : SV_Target0, out float4 ColorOut : SV_Target1)
+void CBReconstruction(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 UpGI : SV_Target0)
 {  int MipLevel = 0;
    float4 tl = GI_Adjusted(texcoords,MipLevel);
    float4 tr = GI_Adjusted(texcoords + float2( pix.x, 0.0  ),MipLevel);
@@ -1434,7 +1425,6 @@ void CBReconstruction(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, ou
    float4 tB = lerp( bl, br, f.x );
 
 	UpGI = lerp( tA, tB, f.y ) * 1.25;//GI_Adjusted(texcoords,0);
-	ColorOut = float4( tex2D( BackBufferPCGI, texcoords).rgb, saturate( dot( Ublur( PCGIcurrColor, texcoords, 5, 100).rgb ,0.333) ) );
 }
 
 float3 GI(float2 TC, float Mips)
@@ -1447,7 +1437,7 @@ float3 GI(float2 TC, float Mips)
 
 float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 {   //Depth Similarity
-	float M_Similarity = 0.5, D_Similarity = saturate(pow(abs(tex2D(PCGIpastFrame,texcoords).w/DepthMap(texcoords, 0).x), 10) + M_Similarity);
+	float M_Similarity = 0.5, D_Similarity = saturate(pow(abs(tex2D(PCGIpastFrame,texcoords).x/Normals_Depth(texcoords, 0).w), 10) + M_Similarity);
 	//Velocity Scaler
 	//float S_Velocity = 12.5 * lerp( 1, 80,TAA_Clamping), V_Buffer = saturate(abs(DepthMap(texcoords, 0)-tex2D(PCGIpastFrame,texcoords).w )* S_Velocity);
 	//Accumulation buffer Start
@@ -1491,10 +1481,14 @@ float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Targe
 	return float4( AA, 1.0) ;
 }
 
+void AccumulatedFramesGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 acc : SV_Target)
+{
+	acc = tex2D(BackBufferPCGI,texcoords).rgba;
+}
 //Horizontal Denoising Upscaling
 float4 BGU_Hoz(float4 position : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
-{   //float AO = Denoise(PCGIupsample_Info,texcoords,SamplesXY, 1, 4).w;
-	return float4( Denoise( BackBufferPCGI          , texcoords, EvenSteven[clamp(SamplesXY,0,20)], 0, 2.5 ).rgb, 0);
+{   
+	return float4( Denoise( PCGIaccuFrames          , texcoords, EvenSteven[clamp(SamplesXY,0,20)], 0, 2.5 ).rgb, 0);
 }
 //Vertical Denoising Upscaling
 float4 BGU_Ver(float4 position : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
@@ -1524,31 +1518,31 @@ float3 Composite(float3 Color, float3 Cloud)
 
 float3 Mix(float2 texcoords)
 {
-	return Composite(tex2Dlod(PCGIbackbuffer_Info,float4(texcoords,0,0)).rgb , tex2Dlod(PCGI_BGUVertical_Sample,float4(texcoords,0,0)).rgb) ;
+	return Composite(tex2Dlod(PCGIcurrColor,float4(texcoords,0,0)).rgb , tex2Dlod(PCGI_BGUVertical_Sample,float4(texcoords,0,0)).rgb) ;
 }   float Text_Info_Plus() { return nonplus() ? Alternate : Text_Info; }
 //Diffusion Blur - Man....... Talk about strange....
 float3 DiffusionBlur(float2 texcoords)
 {
 	float3 Layer,total;
 	float ML = SSSMasking(texcoords).x,
-		  SD = 1-SkinDetection(tex2Dlod(PCGIbackbuffer_Info,float4(texcoords,0,2)) ),
+		  SD = 1-SkinDetection(tex2Dlod(PCGIcurrColor,float4(texcoords,0,2)) ),
 		  NormalBlurFactor = 1.0f,
 		  DepthBlurFactor = 0.009f;
 		  
-	float4 StoredNormals_Depth = tex2Dlod( PCGIcurrNormalsDepth,float4( texcoords, 0, 0));
+	float4 StoredNormals_Depth = Normals_Depth( texcoords, 0);
 
 	if(SD && Scattering && ML && Diffusion_Saturation_Power.x > 0 )
 	{
 		[loop]
 		for(int i = 0; i < 7; ++i)
 		{
-			if(i > 7 || smoothstep( 0, 1, DepthMap(texcoords, 0).y))
+			if(i > 7 || smoothstep( 0, 1, DepthMDC(texcoords, 0)))
 				break;
 
 			float2 offsetxy = texcoords + float2( DBoffsets[i], 0) * pix * lerp( 0.0, 2.0,saturate(Diffusion_Saturation_Power.x));
 			float3 CMix =  Mix( offsetxy ).rgb;
 			
-				float4 ModifiedNormals_Depth = tex2Dlod( PCGIcurrNormalsDepth, float4( offsetxy, 0, 2));//Use lower mip level here on finnished product.
+				float4 ModifiedNormals_Depth = Normals_Depth( offsetxy, 2);//Use lower mip level here on finnished product.
 				float ModN = length(StoredNormals_Depth.xyz - ModifiedNormals_Depth.xyz), ModD = saturate( StoredNormals_Depth.w - ModifiedNormals_Depth.w);
 
 			float D_Dist2 = max(ModD, 0.0), d_w = min(exp(-(D_Dist2)/DepthBlurFactor), 1.0);
@@ -1570,22 +1564,20 @@ float3 DiffusionBlur(float2 texcoords)
 float4 MixOut(float2 texcoords)
 {
 	//float2 Grid = floor( texcoords * float2(BUFFER_WIDTH, BUFFER_HEIGHT ) * pix * 125);//125 lines
-	float  Depth = DepthMap( texcoords,0).x, Guide = Depth_Guide ? ( Depth + 
-													 DepthMap(texcoords + float2( pix.x * 2,         0), 1).x + 
-													 DepthMap(texcoords + float2(-pix.x * 2,         0), 2).x + 
-													 DepthMap(texcoords + float2( 0        , pix.y * 2), 3).x + 
-													 DepthMap(texcoords + float2( 0        ,-pix.y * 2), 4).x   ) * 0.2 : 0;
-	float FakeAO = 1-saturate(Depth - Ublur( PCGIcurrNormalsDepth, texcoords,lerp(1,6,Depth), lerp(0,100,Depth)).w / 1.125);
-		  
+	float  Depth = Normals_Depth(texcoords,0).w, FakeAO = Debug == 1 || Depth_Guide ? ( Depth + 
+				   Normals_Depth(texcoords + float2(pix.x * 2,0),1).w + 
+				   Normals_Depth(texcoords + float2(-pix.x * 2,0),2).w + 
+				   Normals_Depth(texcoords + float2(0,pix.y * 2),Depth_Guide ? 3 : 8).w  + 
+				   Normals_Depth(texcoords + float2(0,-pix.y * 2),Depth_Guide ? 4 : 10) ).w * 0.2 : 0;
 	float3 Output = tex2D( PCGI_BGUVertical_Sample, texcoords).rgb, Layer = DiffusionBlur( texcoords ); float4 Done = float4(Layer,0.5);
 	if(Debug == 0)
-		Done.rgb = Depth_Guide ? Layer.rgb * float3((Depth/Guide> 0.998),1,(Depth/Guide > 0.998))  : Layer.rgb;
+		Done.rgb = Depth_Guide ? Layer.rgb * float3((Depth/FakeAO> 0.998),1,(Depth/FakeAO > 0.998))  : Layer.rgb;
 	else if(Debug == 1)
-		Done.rgb = lerp( saturate(Output + 0.5) * saturate(FakeAO * FakeAO) ,Output,Dark_Mode); //This fake AO is a lie..........
+		Done.rgb = lerp(Output + 0.5 * lerp(1-(Depth-FakeAO * 0.75) ,1,smoothstep(0,1,Depth) == 1),Output,Dark_Mode); //This fake AO is a lie..........
 	else if(Debug == 2)
 		Done.rgb = DirectLighting( texcoords, 0).rgb;
 	else
-		Done.rgb = texcoords.x + texcoords.y < 1 ? DepthMap(texcoords, 0 ).x : NormalsMap(texcoords,0) * 0.5 + 0.5;
+		Done.rgb = texcoords.x + texcoords.y < 1 ? Normals_Depth(texcoords, 0 ).w :  Normals_Depth(texcoords,0).xyz * 0.5 + 0.5;
 
 	return Done;
 }
@@ -1898,22 +1890,24 @@ float4 BackBufferCG(float2 texcoords)
 	return float4(C.rgb,GS);
 }
 
+float2 PackNormals(float3 n)
+{
+    float f = rsqrt(8*n.z+8);
+    return n.xy * f + 0.5;
+}
+
 void CurrentFrame(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Color : SV_Target0, out float4 NormalsDepth : SV_Target1)
 {
 	float4 BBCG = BackBufferCG(texcoords);
-	float DI = Depth_Info(texcoords);
+	float DI = Depth_Info(texcoords), LRBLM = saturate( dot( Ublur( PCGIcurrColor, texcoords, 5, 100) ,0.333) );
 	Color = float4(BBCG.rgb,max(0.0, BBCG.w - lerp(0,1,saturate(Luma_Map))));//,0, smoothstep(0,1,DI) > MaxDepth_CutOff ) ;
-	NormalsDepth = float4(DepthNormals(texcoords),DI);
+	//Packed Normals / Depth / Large Radius Blured Luma Mask
+	NormalsDepth = float4(PackNormals(DepthNormals(texcoords)),DI,LRBLM);
 }
 
-void AccumulatedFramesGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 acc : SV_Target)
-{
-	acc = tex2D(BackBufferPCGI,texcoords).rgba;
-}
-
-void PreviousFrames(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 prev : SV_Target)
+void PreviousFrame(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 prev : SV_Target)
 {	//float PD = dot(tex2D(PCGI_BGUVertical_Sample ,texcoords).rgb,0.333);
-	prev = float4(0,0,0,DepthMap(texcoords, 0).x);
+	prev = Normals_Depth(texcoords, 0).w;//float4(0,0,0,Normals_Depth(texcoords, 0).w);
 }
 /* // Saved for Next Release
 float4 GI_Storage(float4 position : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
@@ -1930,14 +1924,20 @@ void PostProcessVS(in uint id : SV_VertexID, out float4 position : SV_Position, 
 	position = float4(texcoord * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 1.0);
 }
 //*Rendering passes*//
+#if Simp_Mode
 technique PCGI_One
-< toggle = 0x2E;
+< toggle = 0x2E; ui_label = "RadiantGI";
+ui_tooltip = "RadiantGI: Point Cloud Global Illumination."; >
+#else
+technique PCGI_One
+< toggle = 0x2E; ui_label = "PCGI¹";
 ui_tooltip = "Alpha: Global Illumination Primary Generator.¹"; >
+#endif
 {
-		pass PastFrames
+		pass PastFrame
 	{
 		VertexShader = PostProcessVS;
-		PixelShader = PreviousFrames;
+		PixelShader = PreviousFrame;
 		RenderTarget = PCGIpastTex;
 	}
 		pass CopyFrame
@@ -1958,8 +1958,7 @@ ui_tooltip = "Alpha: Global Illumination Primary Generator.¹"; >
 	{
 		VertexShader = PostProcessVS;
 		PixelShader = CBReconstruction;
-		RenderTarget0 = PCGIReconstructionTex;
-		RenderTarget1 = PCGIbackbufferTex;
+		RenderTarget = PCGIReconstructionTex;
 	}
 		pass TAA
 	{
@@ -1972,12 +1971,17 @@ ui_tooltip = "Alpha: Global Illumination Primary Generator.¹"; >
 		PixelShader = AccumulatedFramesGI;
 		RenderTarget = PCGIaccuTex;
 	}
+#if Simp_Mode
+// Simple Mode
+#else
 }
 
 technique PCGI_Two
-< toggle = 0x2E;
+< toggle = 0x2E; ui_label = "PCGI²";
 ui_tooltip = "Beta: Global Illumination Secondary Output.²"; >
 {
+
+#endif
 		pass Edge_Avoiding_Denoiser_H
 	{
 		VertexShader = PostProcessVS;
@@ -2115,5 +2119,11 @@ ui_tooltip = "Beta: Global Illumination Secondary Output.²"; >
 // This was done too reduce the noise in the final image. I also made it sample from Lower MipLeves when lowering Resolution. This seems to reduce noise overall.
 // I also adjusted the color system and the Luma Power options too automaticly increase the TAA accumulation. This seems to be at the veary limit of what
 // my TAA filter can do. I got to admit my 2nd Level Denoiser needs work. But, for now I leave it be. A option was added to adjust for distance irradiance.
+//
+// Update 2.9.9
+//
+// Perf update Texture format change and removed render target. Also added simple mode for new users as an default setting. This change comes after seeing new users struggle
+// too use my shader for the first time. I also changed the tag PCGI_One and PCGI_Two too PCGI¹ and PCGI². Also in simple mode the tag is changed too RadiantGI. I do hope
+// that this change helps users with lower end hardware as well. Shout out to lelfarian moral support and Gordinho for being there I think.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
