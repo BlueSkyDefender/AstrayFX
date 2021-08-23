@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 2.9.9
+//For Reshade 3.0+ PCGI Ver 3.0.0
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -299,6 +299,16 @@ uniform float GI_Ray_Length <
 	ui_category = "PCGI";
 > = 250;
 
+uniform float Trim <
+	ui_type = "slider";
+	ui_min = 0.0; ui_max = 1.0;
+	ui_label = "Trimming";
+	ui_tooltip = "Trim GI by limiting how far the GI is able to effect the objects around them.\n"
+				 "Directional Sky Color is negatively impacted by this option.\n"
+			     "Default is [0.50] and Zero is Off.";
+	ui_category = "PCGI";
+> = 0.5;
+
 uniform float D_Irradiance <
 	ui_type = "slider";
 	ui_min = 0.0; ui_max = 1.0;
@@ -347,9 +357,18 @@ uniform float2 Reflectivness <
 	ui_category = "PCGI";
 > = float2(1.0,0.0);
 
-uniform bool Sky_Contribution<
+uniform bool Sky_Contribution <
 	ui_label = "Directional Sky Color";
 	ui_tooltip = "Lets you use Sky Color Information to contribute too your game.\n"
+			     "Default is Off.";
+	ui_category = "PCGI";
+> = false;
+
+uniform bool Emissive_Mode <
+	ui_label = "Emissive Mode";
+	ui_tooltip = "Lets the shader make all bright objects''Emissive Objects,'' based on approximated information from the emitter.\n"
+				 "Directional Sky Color is negatively impacted by this option.\n"
+			 	"This also makes GI less accurate.\n"
 			     "Default is Off.";
 	ui_category = "PCGI";
 > = false;
@@ -828,6 +847,7 @@ float3 HSLToRGB( in float3 HSL )
 float3 Saturator_A(float3 C, float Depth_Mask,float DD)//DD is Distance Dimming so that Sky irradiance has prefrence.
 {   float Mask = 1-Depth_Mask, Sat = Debug == 2 ? 0.0 : Saturation.x, Distance_Irradiance = lerp(0.5,1.0,saturate(D_Irradiance)), DDMasked = lerp(1-saturate((DD-Distance_Irradiance)/(1-Distance_Irradiance)),1,DD * Depth_Mask);
 	C.rgb *= DDMasked;
+	C.rgb *= lerp(1,lerp(1,6,Trim),Depth_Mask);//Used to keep trimming from effecting Sky color too...much....
 	C.rgb = RGBToHSL(lerp(C.rgb, C.rgb * 1.25,Depth_Mask));// Can boost the sky color irradiance here.
 	C.y *= (Sat * Mask) + lerp(1,Saturation.y,Depth_Mask);
 	return HSLToRGB(C.rgb);
@@ -1287,13 +1307,15 @@ float SSSMasking(float2 TC)
 	return SSSD * smoothstep(0,0.25,1-dot(float3(0,1,0) ,Normals_Depth(TC,0).xyz) * saturate(dot(float3(0,1,0) ,Normals_Depth(TC,0).xyz)) );// || dot(float3(0,1,0) ,NormalsMap(TC,0))
 }
 //Form Factor Approximations
-float RadianceFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB)
+float RadianceFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB,in float STDepth)
 {   //So normal and the vector between "Element to Element - Radiance Transfer."
 	float4 v = float4(normalize(ddiff), length(ddiff));
-	float Mnormals = abs(Reflectivness.x) < 1 ? lerp(3,0,saturate(dot(float3(0,1,0),normals))) : 3;// Trimming = (1000*(1-D_Irradiance)) ;
-	//Emitter & Recever
-	float2 giE_R =  max(float2(   step(   0.0,   dot(   -v.xyz   ,   Normals_Depth(texcoord+AB, Mnormals ).xyz    )    ),   dot( v.xyz, normals )   )   ,0);
-	return saturate((100.0 * giE_R.x * giE_R.y) / ( (v.w*v.w) + PI) );
+	float Mnormals = abs(Reflectivness.x) < 1 ? lerp(3,0,saturate(dot(float3(0,1,0),normals))) : 3, Trimming = lerp(1,5000,saturate(Trim)) ;
+	//Emitter & Recever [With emulated Back-Face lighting.]
+	float giE_Selection = Emissive_Mode ? dot( 1-v.xyz   , 1-Normals_Depth(texcoord+AB, Mnormals ).xyz ) : dot( -v.xyz   , Normals_Depth(texcoord+AB, Mnormals ).xyz );
+	float2 giE_R =  max(float2(   step(   0.0,   giE_Selection    ),   dot( v.xyz, normals )   )   ,0);
+	float FF_Dampen = Emissive_Mode ? PI*20 : PI*10; //Emulated Back-Face lighting Adjustment.
+	return saturate((100 * giE_R.x * giE_R.y) / ( lerp(Trimming,1,STDepth * Sky_Contribution) * (v.w*v.w) + FF_Dampen) );
 }
 /* //This Code is Disabled Not going to use in RadiantGI
 float AmbientOcclusionFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB)
@@ -1351,12 +1373,12 @@ void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Glo
 	float MaskDir = saturate( dot(float3(0,1,0),Normals_Depth(texcoords, 0).xyz) ), Diffusion = lerp(1.0,lerp(1+Reflectivness.y,1.0,abs(Reflectivness.x)), MaskDir );
 	rl_gi_sss.xy *= Reflectivness.x < 0 ? Diffusion : MultiPattern(stexcoords.xy).y ? 1 : Diffusion;
 	//Basic depth rescaling from Near to Far 
-	float D0 = smoothstep(-NCD.x,1, depth ), D1 = smoothstep(-1,1, depth ), N_F = lerp(GI_Fade * 2,0, 1-D );//smoothstep(0,saturate(GI_Fade),D);
+	float D0 = smoothstep(-NCD.x,1, depth ), D1 = smoothstep(-1,1, depth ), N_F = lerp(GI_Fade * 2,0, 1-D ), MDCutOff = smoothstep(0,1,D) > MaxDepth_CutOff;//smoothstep(0,saturate(GI_Fade),D);
 	//SSS, GI, Gloss, and AO Form Factor code look above
 	[fastopt] // Dose this even do anything better vs unroll? Compile times seem the same too me. Maybe this will work better if I use the souls I collect of the users that use this shader?
 	for (int i = 0; i <= Samples; i++)
 	{ //VRS and Max Depth Exclusion...... every ms counts.........
-		if( smoothstep(0,1,D) > MaxDepth_CutOff || clock == 0 || texcoords.x > 1.0 || texcoords.y > 1.0 )
+		if( MDCutOff || clock == 0 || texcoords.x > 1.0 || texcoords.y > 1.0 )
 			break;
 		//Evenly distributed points on Poisson Disk.... But, with High Frequency noise.
 		float2 GIWH = (pix * rl_gi_sss[0]) * random[0] * Rotate2D_A( PoissonTaps[i], random[3], texcoords) / D0,
@@ -1376,7 +1398,7 @@ void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Glo
 			//Irradiance Information
 			II_gi = DirectLighting( texcoords + GIWH, 3 ).rgb * 1.125;
 			//Radiance Form Factor
-			GI.rgb += lerp(II_gi, 0, N_F) * RadianceFF(texcoords, ddiff_gi, n, GIWH);
+			GI.rgb += lerp(II_gi, 0, N_F) * RadianceFF(texcoords, ddiff_gi, n, GIWH, smoothstep(1,0,D));
 		}
 
 		if(!CB1)
@@ -2126,4 +2148,10 @@ ui_tooltip = "Beta: Global Illumination Secondary Output.²"; >
 // too use my shader for the first time. I also changed the tag PCGI_One and PCGI_Two too PCGI¹ and PCGI². Also in simple mode the tag is changed too RadiantGI. I do hope
 // that this change helps users with lower end hardware as well. Shout out to lelfarian moral support and Gordinho for being there I think.
 //
+// Update 3.0.0
+//
+// Emissive Mode added! It lets the shader make all objects emissive based on approximated information from the emitter's luminace information. This adjusted Form Factor can
+// be used to allow emissive light mirror what on the opposite side. Simple and effective option for older games. Also added back Trimming that was removed back in an later update. 
+// The two options do effect Directional Sky Color. But, mitagations where added to help prevent this.
+// 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
