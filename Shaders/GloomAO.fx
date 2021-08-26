@@ -3,7 +3,7 @@
 //-----------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ SSDO Ver 0.1.3
+//For Reshade 4.0+ SSDO Ver 0.1.5
 //-----------------------------
 //                                                                Screen Space Directional Occlusion
 //
@@ -107,9 +107,10 @@
 #define BD_Correction 0        //[Off | On]         Barrel Distortion Correction for non conforming BackBuffer.
 
 //Other Settings
-#define Text_Info_Key 93      //Menu Key            Text Information Key Default 93 is the Menu Key. You can use this site https://keycode.info to pick your own.
-#define Disable_Debug_Info 0  //[Off | On]          Use this to disable help information that gives you hints for fixing many games with Overwatch.fxh.
-#define Minimize_Web_Info 0   //[Off | On]          Use this to minimize the website logo on startup.
+#define Text_Info_Key 93       //Menu Key            Text Information Key Default 93 is the Menu Key. You can use this site https://keycode.info to pick your own.
+#define Disable_Debug_Info 0   //[Off | On]          Use this to disable help information that gives you hints for fixing many games with Overwatch.fxh.
+#define Minimize_Web_Info 0    //[Off | On]          Use this to minimize the website logo on startup.
+#define Force_Texture_Details 0//[Off | On]          This is used to add Texture Detail AO into SSDO output.
 
 //Help / Guide Information stub uniform a idea from LucasM
 uniform int GloomAO <
@@ -154,7 +155,18 @@ uniform float SSDO_SampleRadius <
 				 "Setting this too high will decrease performance.";//High values reduce cache coherence, This will lead to cache misses and decrease performance.
 	ui_category = "SSDO";
 > = 2500.0;
-
+#if Force_Texture_Details
+uniform float SSDO_2DTexture_Detail <
+	ui_type = "slider";
+	ui_min = 0.0; ui_max = 1.0;
+	ui_label = "Texture Details";
+	ui_tooltip = "Lets you add Texture Details to SSDO so you can have Obscurance on 2D information.\n"
+			     "Defaults is [0.0] Off";
+	ui_category = "SSDO";
+> = 0.0;
+#else
+static const int SSDO_2DTexture_Detail = 0;
+#endif
 uniform float NCD <
 	ui_type = "slider";
 	ui_min = 0.0; ui_max = 1.0;
@@ -205,10 +217,10 @@ uniform int SSDO_X2 < //Thank you Nathaniel for the name
 	ui_items = "Square Off\0Square Input\0Square Luma Positive\0Square Luma Negitive\0";
 	ui_label = "Square Input";
 	ui_tooltip = "This option squares the input of BackBuffer for SSDO.\n"
-				 "You can also gavor Illuminated areas or Darker areas.\n"
-				 "This is basically effects the GI Color and AO, Default is off.";
-	ui_category = "Image";
-> = 0;
+				 "You can also favor Illuminated areas or Darker areas.\n"
+				 "This is basically effects the GI Color and AO, Default is Square Luma Negitive.";
+	ui_category = "Image";// Starting to define my look.
+> = 3;
 
 uniform float SSDO_Power<
 	ui_type = "slider";
@@ -224,7 +236,7 @@ uniform float SSDO_ColorPower<
     ui_label = "Color Power";
     ui_tooltip = "This option controls the GI Color intensity.";
 	ui_category = "Image";
-> = 1.25;
+> = 1.5;
 
 uniform float SSDO_Saturation <
 	ui_type = "slider";
@@ -294,7 +306,7 @@ uniform int SamplesXY <
 	ui_label = "Denoise Power";//Ya CeeJay.dk you got your way..
 	ui_tooltip = "This raises or lowers Samples used for the Final DeNoisers which in turn affects Performance.\n"
 				 "This also has the side effect of smoothing out the image so you get that Normal Like Smoothing.\n"
-				 "Default is 4 and you can override this a bit.";
+				 "Default is 3 and you can override this a bit.";
 	ui_category = "Extra Options";
 > = 3;
 
@@ -411,6 +423,9 @@ texture texColorsSSDO { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = R
 sampler SamplerColorsSSDO
 {
 	Texture = texColorsSSDO;
+	MagFilter = POINT;
+	MinFilter = POINT;
+	MipFilter = POINT;
 };
 
 texture texDepthSSDO { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT; Format = R32f; MipLevels = 4; };
@@ -613,6 +628,15 @@ float fmod(float a, float b)
 	return a < 0 ? -c : c;
 }
 
+float BayerLikePattern(float2 texcoords)
+{
+	//Basic Bayer like pattern. Used for 3 levels of Rays. Color names are a hold over for pattern.
+	float2 grid = floor(float2(texcoords.x * BUFFER_WIDTH , texcoords.y * BUFFER_HEIGHT ) );
+	float GB = fmod(grid.x+grid.y,2.0) ? 1 : 0;
+	float GR = fmod(grid.x+grid.y,2.0) ? 0.75 : 0.25;
+	return fmod(grid.x,2.0) ? GR : GB;
+}
+
 float MCNoise(float2 TC,float FC ,float seed)
 {   //This is the noise I used for rendering
 	float motion = FC, a = 12.9898, b = 78.233, c = 43758.5453, dt = dot(TC.xy + 0.5, float2(a,b)), sn = fmod(dt,PI + seed) * motion;
@@ -694,19 +718,71 @@ float Depth_Info(float2 texcoord)
 
 	return  saturate( lerp(NCD > 0 ? zBufferWH : zBuffer,zBuffer,0.925) );
 }   int T_02() { return 25000; }
-
+#if Force_Texture_Details
+void SSDOColors(float4 vpos : SV_Position, float2 texcoords : TEXCOORD,
+						out float4 Colors : SV_Target0)
+{
+		Colors = float4(tex2D(BackBufferSSDO,texcoords).rgb,BayerLikePattern(texcoords));
+}
+#endif
 float2 PackNormals(float3 n)
 {
     float f = rsqrt(8*n.z+8);
     return n.xy * f + 0.5;
 }
+
+#define SUM_RGB(v) ((v).r + (v).g + (v).b)
+float SUMTexture(float2 TC, float Mip)
+{
+	return SUM_RGB(tex2Dlod( SamplerColorsSSDO, float4(TC,0,Mip) ).rgb)   ;
+}
+
+float3 TextureNormals(float2 UV, float Depth)
+{
+	if(saturate(SSDO_2DTexture_Detail) > 0)
+	{
+	    float OG = SUMTexture(  UV , 0 ), SSDO_TD = 1-SSDO_2DTexture_Detail;
+	    // texture coordinates should be between 0.0 and 1.0
+	    float Blur  = SUMTexture( float2(UV.x + pix.x, UV.y) , 1 );
+	          Blur += SUMTexture( float2(UV.x, UV.y + pix.y) , 1 );
+	    	  Blur /= 2;
+			  Blur = lerp(0,Blur,(OG - Blur) > lerp(0,SSDO_TD,Depth));
+		// dt, dx, dy
+		float dx = ddx(Blur);
+		float dy = ddy(Blur);
+
+		// gradient length
+		float dd = sqrt(dx*dx + dy*dy + 1);
+		float2 flow = float2(dx, dy) / dd;
+
+		float mag = length(flow);
+		float len = saturate(mag * 1);
+		float x = 0.5 * (1.0 - flow.x / (len + 0.0001));
+		float y = 0.5 * (1.0 + flow.y / (len + 0.0001));
+		float z = 0.5 * (x + y);
+
+
+		return lerp(float3(x,y,z) * Depth, 0, float3(x,y,z) == 0.5);
+	}
+	else
+		return 0;
+
+}
+
 //PureDepthAO
+#if Force_Texture_Details
+void NormalsDepth(float4 vpos : SV_Position, float2 texcoords : TEXCOORD,
+						out float2 Normals : SV_Target0,
+						out float Depth : SV_Target1)
+{
+#else
 void NormalsColorsDepth(float4 vpos : SV_Position, float2 texcoords : TEXCOORD,
 						out float2 Normals : SV_Target0,
 						out float4 Colors : SV_Target1,
 						out float Depth : SV_Target2)
-{   // WTF right well I got tired of working on this so I just half assed it.
-
+{
+#endif
+    // WTF right well I got tired of working on this so I just half assed it.
 	float2 off1 = float2( pix.x, 0); // right
 	float2 off4 = float2( 0,-pix.y); // up
 	//A 2x2 Taps is done here. You can also do 4x4 tap
@@ -759,10 +835,12 @@ void NormalsColorsDepth(float4 vpos : SV_Position, float2 texcoords : TEXCOORD,
 	float3 Enormal = cross(P2 - P0, P1 - P0);
 	 Enormal.x = -Enormal.x;
 
-	 Enormal = normalize(lerp(normal,Enormal, distance(Enormal,normal) >= 1.0));
+	 Enormal = normalize(lerp( normal + TextureNormals(texcoords, depth), Enormal, distance(Enormal,normal) >= 1.0));
 
 	Normals = PackNormals(Enormal);
-	Colors = float4(tex2D(BackBufferSSDO,texcoords).rgb,1);
+	#if !Force_Texture_Details
+	Colors = float4(tex2D(BackBufferSSDO,texcoords).rgb,BayerLikePattern(texcoords));
+	#endif
 	Depth = depth;
 }
 
@@ -778,9 +856,6 @@ float3 UnpackNormals(float2 enc)
 
 float4 NDSampler(float2 TC, float Mip)
 {
-	//float zoom = (0.5 + 0.5 * TEST);
-    //float2 scaleCenter = 0.5;
-    //float2 uv = (TC - scaleCenter) * zoom + scaleCenter;
 	float3 Norm = UnpackNormals(tex2Dlod(SamplerNormalsSSDO,float4(TC,0,Mip)).xy);
 	float Depth = tex2Dlod(SamplerDepthSSDO,float4(TC,0,Mip)).x;
 
@@ -802,7 +877,19 @@ float3 GetPosition(float2 texcoords,float2 raycoords,float Depth, float FDepth)
 float3 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 {
 	int SSDO_Samples = clamp(SSDO_Levels,1,64);
-	float SSDO_SRM = SSDO_SampleRadius * lerp(1,3,rcp(64)*SSDO_Samples),
+	float BLP = tex2D(SamplerColorsSSDO,texcoords * 0.5f).w * 255, SSDO_BLP = SSDO_SampleRadius;
+
+	//Did this just because Ceejay said bayer not usefull for anything.
+	if(BLP == 255)
+		SSDO_BLP *= 1.00;
+	else if(BLP == 191)
+		SSDO_BLP *= 0.5;
+	else if(BLP == 64)
+		SSDO_BLP *= 0.75;
+	else
+		SSDO_BLP *= 0.25;//Primary
+
+	float SSDO_SRM = SSDO_BLP * lerp(1,3,rcp(64)*SSDO_Samples),
 		  SSDO_Contribution_Range = SSDO_SRM*pix.x*max(SSDO_Trimming,0.001);//simple scale for aka "Zthiccness."
 	const float ATTF = 1e-5; // attenuation factor
 	float3 Noise, random;// Access Noise
@@ -811,7 +898,7 @@ float3 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 		   Noise.z = MCNoise( texcoords , 1, 3 );
 	// Use Random Noise
 		   random = normalize(Noise);
-	float ILuma = Luma(tex2Dlod(SamplerColorsSSDO,float4(texcoords,0,6)).xyz) * 2.0;
+	float ILuma = Luma(tex2Dlod(SamplerColorsSSDO,float4(texcoords,0,3)).xyz) * 2.0;
 	float4 SSDO, Normals_Depth = NDSampler(texcoords, 0);
 
 	float D0 = smoothstep(-1.0,1.0,Normals_Depth.w),D_Fade = SSDO_Fade > 0 ? lerp(1-SSDO_Fade * 2,0, 1-Normals_Depth.w ) : smoothstep(0,abs(SSDO_Fade),Normals_Depth.w);
@@ -1358,14 +1445,21 @@ technique SSDO_Plus
 < ui_label = "GloomAO";
   ui_tooltip = "GloomAO: Screen Space Directional Occlusion"; >
 {
-	/*
-	pass Delay_Info
+	#if Force_Texture_Details
+		pass SSDO_Colors
 	{
 		VertexShader = PostProcessVS;
-		PixelShader = DelayFrame;
-		//RenderTarget0 = texDepthSSDONormals;
+		PixelShader = SSDOColors;
+		RenderTarget = texColorsSSDO;
 	}
-	*/
+		pass SSDO_Normals_Depth
+	{
+		VertexShader = PostProcessVS;
+		PixelShader = NormalsDepth;
+		RenderTarget0 = texNormalsSSDO;
+		RenderTarget1 = texDepthSSDO;
+	}
+	#else
 		pass SSDO_Normals_Depth_Colors
 	{
 		VertexShader = PostProcessVS;
@@ -1374,6 +1468,7 @@ technique SSDO_Plus
 		RenderTarget1 = texColorsSSDO;
 		RenderTarget2 = texDepthSSDO;
 	}
+	#endif
 		pass SSDO
 	{
 		VertexShader = PostProcessVS;

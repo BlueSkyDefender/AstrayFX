@@ -1,7 +1,7 @@
 ////----------------------------------------//
 ///SuperDepth3D Overwatch Automation Shader///
 //----------------------------------------////
-// Version 1.9.4
+// Version 1.9.5
 //---------------------------------------OVERWATCH---------------------------------------//
 // If you are reading this stop. Go away and never look back. From this point on if you  //
 // still think it's is worth looking at this..... Then no one can save you or your soul. //
@@ -2207,6 +2207,15 @@ static const int FOV = 0;                               //Set Game FoV
 	#define SDT 1
 	#define HM 1
 	#define DF_W 0.5
+#elif (App == 0x1BDC0C4C ) //Quake Enhanced Edition
+	#define DA_X 0.1125
+	#define DB_Y 1
+	#define DE_X 3
+	#define DE_Y 0.5
+	#define DE_Z 0.375
+	#define NW 1
+	#define PE 1
+	#define DB_W 71
 #else
 	#define NP 1 //No Profile
 #endif
@@ -2515,7 +2524,7 @@ float3 Weapon_Profiles(float WP ,float3 Weapon_Adjust) //Tried Switch But, can't
     if (WP == 70)
         Value = float3(0.251,5.6875,950.0);   //WP 68 | Mirror Edge
     if (WP == 71)
-        Value = float3(0,0,0);                //WP 69 | Game
+        Value = float3(0.370,10.0,1.85);      //WP 69 | Quake Enhanced Edition
     if (WP == 72)
         Value = float3(0.430,6.250,0.100);    //WP 70 | The Citadel 186
     if (WP == 73)
