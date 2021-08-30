@@ -3,7 +3,7 @@
 //-----------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 4.0+ SSDO Ver 0.2.0
+//For Reshade 4.0+ SSDO Ver 0.2.1
 //-----------------------------
 //                                                                Screen Space Directional Occlusion
 //
@@ -318,6 +318,13 @@ uniform float Persistence <
 				 "Default is 0.125 and a value of 1.0 is off.";
 	ui_category = "Extra Options";
 > = 0.125;
+
+uniform bool Dither_SSDO <
+	ui_label = "Dither SSDO";
+	ui_tooltip = "Add Noise to AO so that it can limit banding in some game.";
+	ui_category = "Extra Options";
+> = true;
+
 #if DB_Size_Position || SP == 2
 uniform float2 Horizontal_and_Vertical <
 	ui_type = "drag";
@@ -732,7 +739,7 @@ float SUMTexture_lookup(float2 TC, float dx, float dy)
 {   float Depth = 1-Depth_Info( TC ); 
 		  Depth = (Depth - 0)/ (lerp(1,10,saturate(1-SSDO_2DTexture_Detail)) - 0);
     float2 uv = (TC.xy + float2(dx , dy ) * pix);
-    float3 c = tex2Dlod( SamplerColorsSSDO, float4(uv.xy,0, 0) ).rgb;
+    float3 c = tex2Dlod( SamplerColorsSSDO, float4(uv.xy,0, 0) ).rgb * 0.5;
     //c = smoothstep(0,1,normalize(c));
 	// return as luma
     return (0.2126*c.r + 0.7152*c.g + 0.0722*c.b) * Depth * 0.00666f;
@@ -768,7 +775,7 @@ float3 TextureNormals(float2 UV, float Depth)
 		float Y = edge * sin(angle + 7.5 * PI / 3.);// Adjust me to rotate Normals
 		float Z = edge * (X - Y);
 
-		return lerp(float3(X,Y,Z) * Depth, 0, float3(X,Y,Z) == 0.5);
+		return min(1,lerp(float3(X,Y,Z) * Depth, 0, float3(X,Y,Z) == 0.5));
 	}
 	else
 		return 0;
@@ -981,7 +988,7 @@ float gaussian(float x, float sigma)
 //Custom Edge Avoiding Gaussian Denoiser
 float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
 {
-	float4 StoredNormals_Depth = NDSampler( texcoords, 0);
+	float4 StoredNormals_Depth = NDSampler( texcoords, 0);//Fix 2nd option by using the 2D texture Mask form the Normals from 2D.
 	float4 center = tex2D(Tex,texcoords), color = 0.0;//Like why do SmoothNormals when 2nd Level Denoiser is like Got you B#*@!........
 	float total = 0.0, NormalBlurFactor = Debug == 1 ? 0.125f : 1.0f, DepthBlurFactor = 0.0125f,  DM = smoothstep(0,1,StoredNormals_Depth.w) > 0.999;
 	R += lerp(2.0,Debug == 1 ? 0.0 : 2.0,NormalMask(texcoords,2.0));
@@ -1107,8 +1114,10 @@ float4 SSDOMixing(float2 texcoords )
 	float3 Noise = float3(MCNoise( texcoords , 1, 1 ), MCNoise( texcoords , 1, 2 ), MCNoise( texcoords , 1, 3 ));
 	float3 SS  = smoothstep( 0.0, 0.1, Saturator(ssdo).rgb );
 		   SS *= 0.0225;
-
+	if(Dither_SSDO)
 		ssdo = saturate(Saturator(ssdo)+ Noise * SS);
+	else
+		ssdo = saturate(Saturator(ssdo));
 
 	float3 Layer = Composite(tex2D(SamplerColorsSSDO,texcoords).xyz,ssdo);
 

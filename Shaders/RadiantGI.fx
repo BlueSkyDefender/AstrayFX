@@ -1124,13 +1124,13 @@ float SUMTexture_lookup(float2 TC, float dx, float dy)
 {   float Depth = 1-Depth_Info( TC ); 
 		  Depth = (Depth - 0)/ (lerp(1,10,saturate(1-PCGI_2DTexture_Detail)) - 0);
     float2 uv = (TC.xy + float2(dx , dy ) * pix);
-    float3 c = tex2Dlod( PCGIcurrColor, float4(uv.xy,0, 1) ).rgb;
+    float3 c = tex2Dlod( BackBufferPCGI, float4(uv.xy,0, 0) ).rgb * 0.5;
 	
 	// return as luma
     return (0.2126*c.r + 0.7152*c.g + 0.0722*c.b) * Depth * 0.00666f;
 }
 
-float3 TextureNormal(float2 UV, float Depth)
+float3 TextureNormals(float2 UV, float Depth)
 {  
 	if(saturate(PCGI_2DTexture_Detail) > 0)
 	{
@@ -1160,7 +1160,7 @@ float3 TextureNormal(float2 UV, float Depth)
 		float Y = edge * sin(angle + 7.5 * PI / 3.);// Adjust me to rotate Normals
 		float Z = edge * (X - Y);
 
-		return lerp(float3(X,Y,Z) * Depth, 0, float3(X,Y,Z) == 0.5);
+		return min(1,lerp(float3(X,Y,Z) * Depth, 0, float3(X,Y,Z) == 0.5));
 	}
 	else
 		return 0;
@@ -1212,7 +1212,7 @@ float3 DepthNormals(float2 texcoord)
 
 	P0 = float3(uv0 - 0.5, 1) * depth;
 
-	return normalize(cross(P2 - P0, P1 - P0) + TextureNormal(texcoord, depth));
+	return normalize(cross(P2 - P0, P1 - P0) + TextureNormals(texcoord, depth));
 }
 
 float3 UnpackNormals(float2 enc)
