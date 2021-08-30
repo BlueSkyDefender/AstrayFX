@@ -3,7 +3,7 @@
 //-----------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 4.0+ SSDO Ver 0.1.5
+//For Reshade 4.0+ SSDO Ver 0.2.0
 //-----------------------------
 //                                                                Screen Space Directional Occlusion
 //
@@ -103,7 +103,7 @@
 #endif
 
 //Depth Buffer Adjustments
-#define DB_Size_Position 0     //[Off | On]         This is used to reposition and the size of the depth buffer.
+#define DB_Size_Position 0     //[Off | On]         This is used to reposition and adjust the size of the depth buffer.
 #define BD_Correction 0        //[Off | On]         Barrel Distortion Correction for non conforming BackBuffer.
 
 //Other Settings
@@ -423,9 +423,6 @@ texture texColorsSSDO { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = R
 sampler SamplerColorsSSDO
 {
 	Texture = texColorsSSDO;
-	MagFilter = POINT;
-	MinFilter = POINT;
-	MipFilter = POINT;
 };
 
 texture texDepthSSDO { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT; Format = R32f; MipLevels = 4; };
@@ -722,7 +719,7 @@ float Depth_Info(float2 texcoord)
 void SSDOColors(float4 vpos : SV_Position, float2 texcoords : TEXCOORD,
 						out float4 Colors : SV_Target0)
 {
-		Colors = float4(tex2D(BackBufferSSDO,texcoords).rgb,BayerLikePattern(texcoords));
+		Colors = float4(tex2D(BackBufferSSDO,texcoords).rgb,1);
 }
 #endif
 float2 PackNormals(float3 n)
@@ -731,38 +728,47 @@ float2 PackNormals(float3 n)
     return n.xy * f + 0.5;
 }
 
-#define SUM_RGB(v) ((v).r + (v).g + (v).b)
-float SUMTexture(float2 TC, float Mip)
-{
-	return SUM_RGB(tex2Dlod( SamplerColorsSSDO, float4(TC,0,Mip) ).rgb)   ;
+float SUMTexture_lookup(float2 TC, float dx, float dy)
+{   float Depth = 1-Depth_Info( TC ); 
+		  Depth = (Depth - 0)/ (lerp(1,10,saturate(1-SSDO_2DTexture_Detail)) - 0);
+    float2 uv = (TC.xy + float2(dx , dy ) * pix);
+    float3 c = tex2Dlod( SamplerColorsSSDO, float4(uv.xy,0, 0) ).rgb;
+    //c = smoothstep(0,1,normalize(c));
+	// return as luma
+    return (0.2126*c.r + 0.7152*c.g + 0.0722*c.b) * Depth * 0.00666f;
 }
 
 float3 TextureNormals(float2 UV, float Depth)
-{
+{  
 	if(saturate(SSDO_2DTexture_Detail) > 0)
 	{
-	    float OG = SUMTexture(  UV , 0 ), SSDO_TD = 1-SSDO_2DTexture_Detail;
-	    // texture coordinates should be between 0.0 and 1.0
-	    float Blur  = SUMTexture( float2(UV.x + pix.x, UV.y) , 1 );
-	          Blur += SUMTexture( float2(UV.x, UV.y + pix.y) , 1 );
-	    	  Blur /= 2;
-			  Blur = lerp(0,Blur,(OG - Blur) > lerp(0,SSDO_TD,Depth));
-		// dt, dx, dy
-		float dx = ddx(Blur);
-		float dy = ddy(Blur);
+		// simple sobel edge detection
+	    float dx = 0.0;
+	    dx += -1.0 * SUMTexture_lookup(UV, -1.5, -1.5);
+	    dx += -2.0 * SUMTexture_lookup(UV, -1.5,  0.0);
+	    dx += -1.0 * SUMTexture_lookup(UV, -1.5,  1.5);
+	    dx +=  1.0 * SUMTexture_lookup(UV,  1.5, -1.5);
+	    dx +=  2.0 * SUMTexture_lookup(UV,  1.5,  0.0);
+	    dx +=  1.0 * SUMTexture_lookup(UV,  1.5,  1.5);
+	    
+	    float dy = 0.0;
+	    dy += -1.0 * SUMTexture_lookup(UV, -1.5, -1.5);
+	    dy += -2.0 * SUMTexture_lookup(UV,  0.0, -1.5);
+	    dy += -1.0 * SUMTexture_lookup(UV,  1.5, -1.5);
+	    dy +=  1.0 * SUMTexture_lookup(UV, -1.5,  1.5);
+	    dy +=  2.0 * SUMTexture_lookup(UV,  0.0,  1.5);
+	    dy +=  1.0 * SUMTexture_lookup(UV,  1.5,  1.5);
 
-		// gradient length
-		float dd = sqrt(dx*dx + dy*dy + 1);
-		float2 flow = float2(dx, dy) / dd;
+		float edge = sqrt(dx*dx + dy*dy);
+			  edge *= edge;
 
-		float mag = length(flow);
-		float len = saturate(mag * 1);
-		float x = 0.5 * (1.0 - flow.x / (len + 0.0001));
-		float y = 0.5 * (1.0 + flow.y / (len + 0.0001));
-		float z = 0.5 * (x + y);
+		float angle = atan2(dx,dy);
+		
+		float X = edge * sin(angle); X = -X;
+		float Y = edge * sin(angle + 7.5 * PI / 3.);// Adjust me to rotate Normals
+		float Z = edge * (X - Y);
 
-
-		return lerp(float3(x,y,z) * Depth, 0, float3(x,y,z) == 0.5);
+		return lerp(float3(X,Y,Z) * Depth, 0, float3(X,Y,Z) == 0.5);
 	}
 	else
 		return 0;
@@ -839,7 +845,7 @@ void NormalsColorsDepth(float4 vpos : SV_Position, float2 texcoords : TEXCOORD,
 
 	Normals = PackNormals(Enormal);
 	#if !Force_Texture_Details
-	Colors = float4(tex2D(BackBufferSSDO,texcoords).rgb,BayerLikePattern(texcoords));
+	Colors = float4(tex2D(BackBufferSSDO,texcoords).rgb,1);
 	#endif
 	Depth = depth;
 }
@@ -877,19 +883,7 @@ float3 GetPosition(float2 texcoords,float2 raycoords,float Depth, float FDepth)
 float3 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 {
 	int SSDO_Samples = clamp(SSDO_Levels,1,64);
-	float BLP = tex2D(SamplerColorsSSDO,texcoords * 0.5f).w * 255, SSDO_BLP = SSDO_SampleRadius;
-
-	//Did this just because Ceejay said bayer not usefull for anything.
-	if(BLP == 255)
-		SSDO_BLP *= 1.00;
-	else if(BLP == 191)
-		SSDO_BLP *= 0.5;
-	else if(BLP == 64)
-		SSDO_BLP *= 0.75;
-	else
-		SSDO_BLP *= 0.25;//Primary
-
-	float SSDO_SRM = SSDO_BLP * lerp(1,3,rcp(64)*SSDO_Samples),
+	float SSDO_SRM = SSDO_SampleRadius,
 		  SSDO_Contribution_Range = SSDO_SRM*pix.x*max(SSDO_Trimming,0.001);//simple scale for aka "Zthiccness."
 	const float ATTF = 1e-5; // attenuation factor
 	float3 Noise, random;// Access Noise
@@ -928,7 +922,6 @@ float3 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 			   LocalGI *= lerp(1,LocalGI,1-ILuma);
 
 			   //LocalGI = Saturator(LocalGI);
-
 			   LocalGI *= SSDO_ColorPower;
 
 		// Compute the bounce geometric shape towards the direction of the blocker. Aka Position
@@ -940,7 +933,7 @@ float3 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 			   AO *= sign( length(Normals_Depth.xyz-vsFetch.xyz) );
 		// Listed as attenuation......
 		float SSDO_RangeCheck = max(0.0,SSDO_Contribution_Range-length(Pos))/SSDO_Contribution_Range;
-		SSDO += lerp(saturate(1-LocalGI) * AO * SSDO_RangeCheck * SSDO_RangeCheck,0,D_Fade);
+		SSDO += lerp(saturate(1-LocalGI) * AO * SSDO_RangeCheck,0,D_Fade);
 	}
 
 	SSDO /= SSDO_Samples;
@@ -975,7 +968,7 @@ float4 Median(sampler Tex, float2 texcoords )
 }
 
 float4 Median_Filter_SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
-{//lerp(float4(1,0,0,1),SSDO,Luma(SSDO.rgb) > TEST)
+{
     return Median(SamplerSSDO,texcoords);//Used to reduce Salt and Pepper Noise
 }
 
@@ -1025,12 +1018,6 @@ float4 CEAGD_V_SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV
 {
 	return Denoise(SamplerSSDOH, texcoords, EvenSteven[clamp(SamplesXY,0,20)], 1, 2.5 );
 }
-/*
-float4 DelayFrame(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
-{
-	return 0;
-}
-*/
 
 float4 TAA_SSDO(float2 texcoords,float Mip)
 {
@@ -1113,12 +1100,15 @@ float4 SSDOMixing(float2 texcoords )
 													NDSampler(texcoords + float2( 0        , pix.y * 2), 3).w +
 													NDSampler(texcoords + float2( 0        ,-pix.y * 2), 4).w   ) * 0.2f : 0.00000001f;
 	//Mip Denoiser
-	float3 ssdo = lerp(SSDO_MipBLur( SSDOaccuFrames, texcoords,1),SSDO_MipBLur( SSDOaccuFrames, texcoords,0),NormalMask(texcoords,2));
+	float3 ssdo = lerp(SSDO_MipBLur( SSDOaccuFrames, texcoords,2),SSDO_MipBLur( SSDOaccuFrames, texcoords,0),NormalMask(texcoords,1));
 
 	if(smoothstep(0,1,Depth) > SSDO_Max_Depth)
 		ssdo = 1;
+	float3 Noise = float3(MCNoise( texcoords , 1, 1 ), MCNoise( texcoords , 1, 2 ), MCNoise( texcoords , 1, 3 ));
+	float3 SS  = smoothstep( 0.0, 0.1, Saturator(ssdo).rgb );
+		   SS *= 0.0225;
 
-		ssdo = saturate(Saturator(ssdo));
+		ssdo = saturate(Saturator(ssdo)+ Noise * SS);
 
 	float3 Layer = Composite(tex2D(SamplerColorsSSDO,texcoords).xyz,ssdo);
 

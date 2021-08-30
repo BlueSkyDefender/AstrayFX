@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 3.0.0
+//For Reshade 3.0+ PCGI Ver 3.0.1
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -133,19 +133,20 @@
 //This GI shader is free and shouldn't sit behind a paywall. If you paid for this shader ask for a refund right away.
 
 //Depth Buffer Adjustments
-#define DB_Size_Position 0     //[Off | On]         This is used to reposition and the size of the depth buffer.
+#define DB_Size_Position 0     //[Off | On]         This is used to reposition and adjusts the size of the depth buffer.
 #define BD_Correction 0        //[Off | On]         Barrel Distortion Correction for non conforming BackBuffer.
 
 //TAA Quality Level
-#define TAA_Clamping 0.2      //[0.0 - 1.0]         Use this to adjust TAA clamping.
+#define TAA_Clamping 0.2       //[0.0 - 1.0]         Use this to adjust TAA clamping.
 
 //Other Settings
-#define Controlled_Blend 0    //[Off | On]          Use this if you want control over blending GI in to the final
-#define Dark_Mode 0           //[Off | On]          Instead of using a 50% gray it displays Black for the absence of information.
-#define Text_Info_Key 93      //Menu Key            Text Information Key Default 93 is the Menu Key. You can use this site https://keycode.info to pick your own.
-#define Disable_Debug_Info 0  //[Off | On]          Use this to disable help information that gives you hints for fixing many games with Overwatch.fxh.
-#define Minimize_Web_Info 0   //[Off | On]          Use this to minimize the website logo on startup.
-#define ForcePool 0           //[Off | On]          Force Pooled Textures in versions 4.9.0+ If you get a black screen turn this too off. Seems to be a ReShade Issue.
+#define Controlled_Blend 0     //[Off | On]          Use this if you want control over blending GI in to the final
+#define Dark_Mode 0            //[Off | On]          Instead of using a 50% gray it displays Black for the absence of information.
+#define Text_Info_Key 93       //Menu Key            Text Information Key Default 93 is the Menu Key. You can use this site https://keycode.info to pick your own.
+#define Disable_Debug_Info 0   //[Off | On]          Use this to disable help information that gives you hints for fixing many games with Overwatch.fxh.
+#define Minimize_Web_Info 0    //[Off | On]          Use this to minimize the website logo on startup.
+#define ForcePool 0            //[Off | On]          Force Pooled Textures in versions 4.9.0+ If you get a black screen turn this too off. Seems to be a ReShade Issue.
+#define Force_Texture_Details 0//[Off | On]          This is used to add Texture Detail AO into PCGI output.
 
 
 //RadiantGI In menu Options
@@ -298,6 +299,19 @@ uniform float GI_Ray_Length <
 			     "This scales automatically with multi level detail."; // So the name not 100% correct. But, it's close enough.
 	ui_category = "PCGI";
 > = 250;
+
+#if Force_Texture_Details
+uniform float PCGI_2DTexture_Detail <
+	ui_type = "slider";
+	ui_min = 0.0; ui_max = 1.0;
+	ui_label = "Texture Details";
+	ui_tooltip = "Lets you add Texture Details to PCGI so you can have GI on 2D information.\n"
+			     "Defaults is [0.0] Off";
+	ui_category = "PCGI";
+> = 0.0;
+#else
+static const int PCGI_2DTexture_Detail = 0;
+#endif
 
 uniform float Trim <
 	ui_type = "slider";
@@ -1105,6 +1119,53 @@ float Depth_Info(float2 texcoord)
 
 	return  saturate( lerp(NCD.y > 0 ? zBufferWH : zBuffer,zBuffer,0.925) );
 }
+
+float SUMTexture_lookup(float2 TC, float dx, float dy)
+{   float Depth = 1-Depth_Info( TC ); 
+		  Depth = (Depth - 0)/ (lerp(1,10,saturate(1-PCGI_2DTexture_Detail)) - 0);
+    float2 uv = (TC.xy + float2(dx , dy ) * pix);
+    float3 c = tex2Dlod( PCGIcurrColor, float4(uv.xy,0, 1) ).rgb;
+	
+	// return as luma
+    return (0.2126*c.r + 0.7152*c.g + 0.0722*c.b) * Depth * 0.00666f;
+}
+
+float3 TextureNormal(float2 UV, float Depth)
+{  
+	if(saturate(PCGI_2DTexture_Detail) > 0)
+	{
+		// simple sobel edge detection
+	    float dx = 0.0;
+	    dx += -1.0 * SUMTexture_lookup(UV, -2.0, -2.0);
+	    dx += -2.0 * SUMTexture_lookup(UV, -2.0,  0.0);
+	    dx += -1.0 * SUMTexture_lookup(UV, -2.0,  2.0);
+	    dx +=  1.0 * SUMTexture_lookup(UV,  2.0, -2.0);
+	    dx +=  2.0 * SUMTexture_lookup(UV,  2.0,  0.0);
+	    dx +=  1.0 * SUMTexture_lookup(UV,  2.0,  2.0);
+	    
+	    float dy = 0.0;
+	    dy += -1.0 * SUMTexture_lookup(UV, -2.0, -2.0);
+	    dy += -2.0 * SUMTexture_lookup(UV,  0.0, -2.0);
+	    dy += -1.0 * SUMTexture_lookup(UV,  2.0, -2.0);
+	    dy +=  1.0 * SUMTexture_lookup(UV, -2.0,  2.0);
+	    dy +=  2.0 * SUMTexture_lookup(UV,  0.0,  2.0);
+	    dy +=  1.0 * SUMTexture_lookup(UV,  2.0,  2.0);
+
+		float edge = sqrt(dx*dx + dy*dy);
+			  edge *= edge;
+
+		float angle = atan2(dx,dy);
+		
+		float X = edge * sin(angle); //X= -X;
+		float Y = edge * sin(angle + 7.5 * PI / 3.);// Adjust me to rotate Normals
+		float Z = edge * (X - Y);
+
+		return lerp(float3(X,Y,Z) * Depth, 0, float3(X,Y,Z) == 0.5);
+	}
+	else
+		return 0;
+
+}
 //Improved Normal reconstruction from Depth
 float3 DepthNormals(float2 texcoord)
 {
@@ -1151,7 +1212,7 @@ float3 DepthNormals(float2 texcoord)
 
 	P0 = float3(uv0 - 0.5, 1) * depth;
 
-	return normalize(cross(P2 - P0, P1 - P0));
+	return normalize(cross(P2 - P0, P1 - P0) + TextureNormal(texcoord, depth));
 }
 
 float3 UnpackNormals(float2 enc)
