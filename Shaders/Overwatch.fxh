@@ -1,7 +1,7 @@
 ////----------------------------------------//
 ///SuperDepth3D Overwatch Automation Shader///
 //----------------------------------------////
-// Version 1.9.5
+// Version 1.9.6
 //---------------------------------------OVERWATCH---------------------------------------//
 // If you are reading this stop. Go away and never look back. From this point on if you  //
 // still think it's is worth looking at this..... Then no one can save you or your soul. //
@@ -2209,7 +2209,8 @@ static const int FOV = 0;                               //Set Game FoV
 	#define HM 1
 	#define DF_W 0.5
 #elif (App == 0x1BDC0C4C ) //Quake Enhanced Edition
-	#define DA_X 0.1125
+	#define DA_X 0.07
+	#define DA_Y 13.0
 	#define DB_Y 1
 	#define DE_X 3
 	#define DE_Y 0.5
@@ -2217,6 +2218,26 @@ static const int FOV = 0;                               //Set Game FoV
 	#define NW 1
 	#define PE 1
 	#define DB_W 71
+	#define DF_X 0.250
+#elif (App == 0xB3729F40 ) //Rocket League Steam
+	#define DA_Y 50.0
+	#define DA_X 0.100
+	#define DB_Y 5
+	#define DS 1
+	#define NW 1
+	#define PE 1
+#elif (App == 0x1BB6E62A ) //AMIN EVIL RTX
+    #define DA_W 1
+	#define DA_X 0.07
+	#define DA_Y 12.5
+	#define DA_Z 0.000125
+	#define DB_Y 5
+	#define DE_X 3
+	#define DE_Y 0.5
+	#define DE_Z 0.45
+	#define PE 1
+	#define DA 1
+	#define DB_W 27
 #else
 	#define NP 1 //No Profile
 #endif
@@ -2437,7 +2458,7 @@ float3 Weapon_Profiles(float WP ,float3 Weapon_Adjust) //Tried Switch But, can't
     if (WP == 26)
         Weapon_Adjust = float3(0.255,6.375,53.75);    //WP 24 | S.T.A.L.K.E.R: Games
     if (WP == 27)
-        Weapon_Adjust = float3(0,0,0);                //WP 25 | Game
+        Weapon_Adjust = float3(0.450,8.0,0.400);      //WP 25 | AMID EVIL RTX
     if (WP == 28)
         Weapon_Adjust = float3(0.750,30.0,1.025);     //WP 26 | Prey 2006
     if (WP == 29)
@@ -2451,7 +2472,7 @@ float3 Weapon_Profiles(float WP ,float3 Weapon_Adjust) //Tried Switch But, can't
     if (WP == 33)
         Weapon_Adjust = float3(1.0,93.75,0.81875);    //WP 31 | Wolfenstein: The New Order #C770832 / The Old Blood #3E42619F
     if (WP == 34)
-        Weapon_Adjust = float3(0,0,0);                //WP 32 | Wolfenstein II: The New Colossus / Cyberpilot
+        Weapon_Adjust = float3(0,0,0);                //WP 32 | Game
     if (WP == 35)
         Weapon_Adjust = float3(0.278,37.50,9.1);      //WP 33 | Black Mesa
     if (WP == 36)
@@ -2491,7 +2512,7 @@ float3 Weapon_Profiles(float WP ,float3 Weapon_Adjust) //Tried Switch But, can't
     if (WP == 53)
         Weapon_Adjust = float3(1.0,237.5,0.83625);    //WP 51 | Rage64 #AA6B948E
     if (WP == 54)
-        Weapon_Adjust = float3(0,0,0);                //WP 52 | Rage 2
+        Weapon_Adjust = float3(0,0,0);                //WP 52 | Game
     if (WP == 55)
         Weapon_Adjust = float3(0.425,15.0,99.0);      //WP 53 | Bioshock Remastred #44BD41E1
     if (WP == 56)
@@ -2525,7 +2546,7 @@ float3 Weapon_Profiles(float WP ,float3 Weapon_Adjust) //Tried Switch But, can't
     if (WP == 70)
         Weapon_Adjust = float3(0.251,5.6875,950.0);   //WP 68 | Mirror Edge
     if (WP == 71)
-        Weapon_Adjust = float3(0.370,10.0,1.85);      //WP 69 | Quake Enhanced Edition
+        Weapon_Adjust = float3(0.345,10.125,1.825);   //WP 69 | Quake Enhanced Edition
     if (WP == 72)
         Weapon_Adjust = float3(0.430,6.250,0.100);    //WP 70 | The Citadel 186
     if (WP == 73)
