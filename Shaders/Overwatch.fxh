@@ -1,7 +1,7 @@
 ////----------------------------------------//
 ///SuperDepth3D Overwatch Automation Shader///
 //----------------------------------------////
-// Version 1.9.7
+// Version 1.9.8
 //---------------------------------------OVERWATCH---------------------------------------//
 // If you are reading this stop. Go away and never look back. From this point on if you  //
 // still think it's is worth looking at this..... Then no one can save you or your soul. //
@@ -54,7 +54,7 @@ static const float ZPD_Weapon_Boundary_Adjust = 0.0;    //ZPD Weapon Boundary Ad
 static const float Separation = 0.0;                    //ZPD Separation
 static const float Edge_Masking = 0.0;                  //Edge Masking Adjust
 static const float HUDX_D = 0.0;                        //Heads Up Display Cut Off Point
-static const float Null_X = 0.0;                        //
+static const float Manual_ZPD_Balance = 0.5;            //Manual Balance Mode Adjustment
 static const float Null_Y = 0.0;                        //
 static const float Weapon_Near_Depth_Min_D = 0.0;       //Weapon Near Depth              Min
 static const float Check_Depth_Limit = 0.0;             //Check Depth Limit
@@ -69,7 +69,7 @@ static const int DFW = 0;                               //Delay Frame Workaround
 static const int ALB = 0;                               //Auto Letter Box
 static const int LBD = 0;                               //Letter Box Depth
 static const int STD = 0;                               //Specialized Depth Trigger
-
+static const int BMT = 0;                               //Balance Mode Toggle
 //Special Toggles Generic
 static const int RHW = 0;                               //Read Help Warning
 static const int EDW = 0;                               //Emulator Detected Warning
@@ -648,15 +648,24 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DA_X 0.25
 	#define DF_Y 0.125
 	#define DA_Z 0.0015
-	#define DB_Y 5 				//ZPD Boundary Scaling
-  #define DB_Z 0.325		//Auto Depth Adjust
+	#define DB_Y 5 		//ZPD Boundary Scaling
+	#define DB_Z 0.325	//Auto Depth Adjust
 	#define PE 1
 #elif (App == 0xC0AC5174 ) //Observer
 	#define DA_W 1
-	#define DA_Y 21.5
-	#define DA_X 0.0375
-	#define DB_Y 4
+	#define DA_Y 20.0
+	#define DA_X 0.05
+    #define DF_Y 0.01
+    #define DA_Z 0.0005
+	#define DB_Y 5 //Fall Back
+	#define DE_X 2
+	#define DE_Y 0.275
+	#define DE_Z 0.400
+	#define DG_W 0.1875 // Slight adjustment to the ZPD Boundary
+	#define BM 1 // Had to use this mode since Auto Mode was not cutting it.
+	#define DG_X 0.1
 	#define RH 1
+	#define PE 1
 #elif (App == 0xABAA2255 ) //The Forest
 	#define DA_W 1
 	#define DB_X 1
@@ -2266,20 +2275,20 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DA_Y 11.25
 	//#define DA_Z 0.00125
 	#define DA_X 0.100
-    #define DF_Y 0.108
+	#define DF_Y 0.108
 	#define DB_X 1
 	#define DB_Y 5
 	#define DE_X 1
 	#define DE_Y 0.6
 	#define DE_Z 0.375
-    #define DG_Z 0.075
-    #define NW 1
-    #define DS 1
+	#define DG_Z 0.075
+	#define NW 1
+	#define DS 1
 #elif (App == 0xD0F69E54 ) //Yooka-Laylee
 	#define DA_Y 13.0
 	#define DA_Z 0.001
 	#define DA_X 0.09125
-    #define DF_Y 0.00625
+	#define DF_Y 0.00625
 	#define DB_X 1
 	#define DB_Y 4
 	#define DE_X 2
@@ -2290,7 +2299,7 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DA_Y 80.0
 	#define DA_Z 0.00025
 	#define DA_X 0.0725
-    #define DF_Y 0.010
+	#define DF_Y 0.010
 	#define DB_X 1
 	#define DB_Y 4
 	#define DE_X 2
@@ -2299,11 +2308,28 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DA_Y 15.0
 	#define DA_Z 0.0002
 	#define DA_X 0.100
-    //#define DF_Y 0.005
+	//#define DF_Y 0.005
 	#define DB_Y 4
 	#define DE_X 1
 	#define DE_Y 0.525
 	#define DE_Z 0.400
+#elif (App == 0x491EA19E ) //Cyberpunk 2077
+	#define DA_W 1
+	#define DA_Y 70.0
+	#define DA_Z 0.00010
+	#define DA_X 0.050
+	#define DB_Z 0.150
+	#define DF_Y 0.05125
+	#define DB_Y 2 //?? Auto Mode didn't work well in this game.
+	#define DE_X 3
+	#define DE_Y 0.500
+	#define DE_Z 0.400
+	#define DB_W 34
+	#define DF_X 0.20
+	#define DG_W 0.15
+	#define BM 1
+	#define DG_X 0.1375
+	#define PE 1
 #else
 	#define NP 1 //No Profile
 #endif
@@ -2387,9 +2413,9 @@ static const int FOV = 0;                               //Set Game FoV
 #ifndef DF_W
     #define DF_W HUDX_D
 #endif
-// X = [Null] Y = [Null] Z = [Weapon NearDepth Min] W = [Check Depth Limit]
+// X = [ZPD Balance] Y = [Null] Z = [Weapon NearDepth Min] W = [Check Depth Limit]
 #ifndef DG_X
-    #define DG_X Null_X
+    #define DG_X Manual_ZPD_Balance
 #endif
 #ifndef DG_Y
     #define DG_Y Null_Y
@@ -2461,6 +2487,9 @@ static const int FOV = 0;                               //Set Game FoV
 #endif
 #ifndef FV
     #define FV FOV //Set Game FoV
+#endif
+#ifndef BM
+    #define BM BMT //Balance Mode Toggle
 #endif
 //Weapon Settings
 #ifndef OW_WP
@@ -2538,7 +2567,7 @@ float3 Weapon_Profiles(float WP ,float3 Weapon_Adjust) //Tried Switch But, can't
     if (WP == 33)
         Weapon_Adjust = float3(1.0,93.75,0.81875);    //WP 31 | Wolfenstein: The New Order #C770832 / The Old Blood #3E42619F
     if (WP == 34)
-        Weapon_Adjust = float3(0,0,0);                //WP 32 | Game
+        Weapon_Adjust = float3(1.150,55.0,0.9);       //WP 32 | Cyberpunk 2077
     if (WP == 35)
         Weapon_Adjust = float3(0.278,37.50,9.1);      //WP 33 | Black Mesa
     if (WP == 36)

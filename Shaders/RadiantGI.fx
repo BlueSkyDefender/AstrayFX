@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 3.0.1
+//For Reshade 3.0+ PCGI Ver 3.0.2
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -241,7 +241,12 @@ static const float ig = 1.0;                 //LUT Gamma Adjustment 0.05 - 10.0
 #else
 	#define Compatibility_TF 0
 #endif
-
+//Check DX9 Game
+#if __RENDERER__ == 0x9000
+	#define DX9 1
+#else
+	#define DX9 0
+#endif
 //This GI shader is free and shouldn't sit behind a paywall. If you paid for this shader ask for a refund right away.
 //Automatic Adjustment based on Resolutionsup to 4k considered. LOL good luck with 8k in 2020
 #if (BUFFER_HEIGHT <= 720)
@@ -1439,8 +1444,13 @@ void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Glo
 	[fastopt] // Dose this even do anything better vs unroll? Compile times seem the same too me. Maybe this will work better if I use the souls I collect of the users that use this shader?
 	for (int i = 0; i <= Samples; i++)
 	{ //VRS and Max Depth Exclusion...... every ms counts.........
+		#if DX9
+		if( MDCutOff || clock == 0 || texcoords.x > 1.0 || texcoords.y > 1.0 )
+			discard;
+		#else
 		if( MDCutOff || clock == 0 || texcoords.x > 1.0 || texcoords.y > 1.0 )
 			break;
+		#endif
 		//Evenly distributed points on Poisson Disk.... But, with High Frequency noise.
 		float2 GIWH = (pix * rl_gi_sss[0]) * random[0] * Rotate2D_A( PoissonTaps[i], random[3], texcoords) / D0,
 			   //GDWH = (pix * rl_gi_sss[1]) * random[1] * Rotate2D_B( PoissonTaps[i], random[2]) / D0,
@@ -2215,4 +2225,8 @@ ui_tooltip = "Beta: Global Illumination Secondary Output.²"; >
 // be used to allow emissive light mirror what on the opposite side. Simple and effective option for older games. Also added back Trimming that was removed back in an later update. 
 // The two options do effect Directional Sky Color. But, mitagations where added to help prevent this.
 // 
+// Update 3.0.2
+//
+// DX 9 workaround................ it works.... I think.
+//
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
