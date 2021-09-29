@@ -1,7 +1,7 @@
 ////----------------------------------------//
 ///SuperDepth3D Overwatch Automation Shader///
 //----------------------------------------////
-// Version 2.0.1
+// Version 2.0.7
 //---------------------------------------OVERWATCH---------------------------------------//
 // If you are reading this stop. Go away and never look back. From this point on if you  //
 // still think it's is worth looking at this..... Then no one can save you or your soul. //
@@ -52,7 +52,7 @@ static const float ZPD_Boundary_Fade_Time_D = 0.25;     //ZPD Boundary Fade Time
 static const float Weapon_Near_Depth_Max_D = 0.0;       //Weapon Near Depth              Max
 static const float ZPD_Weapon_Boundary_Adjust = 0.0;    //ZPD Weapon Boundary Adjust
 static const float Separation = 0.0;                    //ZPD Separation
-static const float Edge_Masking = 0.0;                  //Edge Masking Adjust
+static const float Null_Z = 0.0;                        //
 static const float HUDX_D = 0.0;                        //Heads Up Display Cut Off Point
 static const float Manual_ZPD_Balance = 0.5;            //Manual Balance Mode Adjustment
 static const float Null_Y = 0.0;                        //
@@ -134,7 +134,7 @@ static const int FOV = 0;                               //Set Game FoV
 #elif (App == 0x7B81CCAB || App == 0xFB9A99AB )	//BorderLands 2 & Pre-Sequel
 	#define DA_Y 25.0
 	#define DA_Z 0.00025
-	#define DA_X 0.03625
+	#define DA_X 0.03750
 	#define DB_Y 2
 	#define DB_W 4
 	#define DE_X 4
@@ -143,13 +143,17 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DF_X 0.300
 	#define NW 1
 #elif (App == 0x2D950D30 )	//Fallout 4
-	#define DA_X 0.0375
-	#define DA_Y 7.8
+	#define DA_X 0.05
+	//#define DA_Y 7.8
 	#define DB_Y 3
 	#define DB_W 6
 	#define DF_Y 0.012
+	#define DE_X 3
+	#define DE_Y 0.750
+	#define DE_Z 0.375
 	#define FV 1
 	#define RH 1
+	#define DS 1
 #elif (App == 0x3950D04E )	//Skyrim: SE
 	#define DA_Y 6.25
 	#define DB_Y 2
@@ -245,8 +249,15 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DB_W 35
 	#define DB_Z 0.08625
 #elif (App == 0x6D3CD99E ) //Blood 2
-	#define DB_W 36
-	#define DB_Y 3
+	#define DA_X 0.105
+	#define DB_Y 2
+	#define DE_X 3
+	//#define DE_Y 0.50
+	#define DE_Z 0.475
+	#define WSM 5
+	#define DB_W 2
+	#define OW_WP "Read Help & Change Me\0Custom WP\0Blood 2 All Weapons\0Blood 2 Bonus Weapons\0Blood 2 Former\0"
+	#define WW 1
 	#define NF 1
 	#define RH 1
 #elif (App == 0xF22A9C7D || App == 0x5416A79D ) //SOMA
@@ -1116,7 +1127,7 @@ static const int FOV = 0;                               //Set Game FoV
 	//#define DA_X 0.0375 //Alternet settings Not used.
 	#define PE 1
 #elif (App == 0x47F294E9 ) //Octopath Traveler
-	#define DA_Y 225.0
+	#define DA_Y 250.0
 	#define DA_Z 0.000375
 	#define DA_X 0.1175
 	#define DA_W 1
@@ -1124,6 +1135,7 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DE_X 1
 	#define DE_Y 0.5625
 	#define DE_Z 0.375
+	#define DG_W 0.2125
 	#define RH 1
 #elif (App == 0x21CB998 ) //.Hack//G.U.
 	#define DA_Y 22.5
@@ -1272,18 +1284,19 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DE_X 2
 	#define DE_Y 0.5
 	#define DE_Z 0.375
-  #define DE_W 0.3875
+	//#define DE_W 0.3875
 	#define RH 1
 #elif (App == 0x9896B9F5 ) //Old City: Leviathan
-	#define DA_X 0.025
-	#define DA_Y 100.0
-	#define DA_Z 0.003
-	#define DB_Y 5
+	#define DA_X 0.030
+	#define DA_Y 82.5
+	#define DA_Z 0.0015
+	#define DB_Y 4
 	#define DE_X 1
-	#define DE_Y 0.5
+	//#define DE_Y 0.250
 	#define DE_Z 0.375
-	#define DB_Z 0.0275
-	#define RH 1
+	#define DB_Z 0.075
+	//#define DG_Z 0.5
+	#define DS 1
 #elif (App == 0xE4F6014F ) //Shovel Knight
 	#define DB_X 1
 	#define DA_X 0.035
@@ -1302,14 +1315,14 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DB_Z 0.125
 	#define DB_W 74
 #elif (App == 0xF6F3C763 ) //WRATH
-	#define DA_X 0.0625
+	#define DA_X 0.065
 	#define DA_Y 75.0
 	#define DA_Z 0.00005
-	#define DB_Y 4
+	#define DB_Y 2
 	#define DE_X 3
 	#define DE_Y 0.5
 	#define DE_Z 0.375
-	#define DB_Z 0.125
+	#define DB_Z 0.090
 	#define DB_W 29
 	#define DF_X 0.1
 #elif (App == 0xB05C57BC ) //HellBound
@@ -1366,13 +1379,16 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DE_Y 0.5
 	#define DE_Z 0.375
 #elif (App == 0x9DA6C947 ) //Beyond Two Souls
-	#define DA_X 0.05
-	#define DA_Y 25.0
-	#define DB_Y 4
+	#define DA_X 0.0625
+    #define DF_Y 0.0275
+	#define DA_Y 20.00
+	#define DB_Y 3
 	#define DE_X 1
-	#define DE_Y 0.5
+	//#define DE_Y 0.5
 	#define DE_Z 0.375
-	#define DF_Z 0.5
+	#define DG_W 0.175
+	//#define BM 1
+	//#define DG_X 0.1375
 	#define DS 1
 	#define LBC 1
 #elif (App == 0x89351FC4 ) //3DSen Games
@@ -1540,13 +1556,15 @@ static const int FOV = 0;                               //Set Game FoV
 	#define RH 1
 #elif (App == 0x54D4EAFA) //Sekiro Shadows Die Twice
 	#define DA_W 1
-	#define DA_X 0.0625
-	#define DA_Y 59.375
+	//#define DA_X 0.0625
+	#define DA_X 0.10
+	//#define DA_Y 59.375
+	#define DA_Y 30.0
 	#define DA_Z 0.000375
-	#define DB_Z 0.125
+	//#define DB_Z 0.125
 	#define DB_Y 1
 	#define DE_X 2
-	#define DE_Y 0.5
+	#define DE_Y 0.275
 	#define DE_Z 0.375
    // #define DF_Z -0.125
 	#define DA 1
@@ -1563,12 +1581,15 @@ static const int FOV = 0;                               //Set Game FoV
 #elif (App == 0x3604DCE6 ) //Remnant: From the Ashes
 	#define DA_W 1
 	#define DA_X 0.07
-	#define DA_Y 15.0
-	#define DB_Y 1
+	//#define DF_Y 0.038
+	#define DA_Y 15.5
+	#define DB_Y 2
 	#define DE_X 1
 	#define DE_Y 0.5
 	#define DE_Z 0.375
-	#define DF_Z -0.125
+	//#define DF_Z -0.125
+	//#define BM 1
+	//#define DG_X 0.1
 	#define NW 1
 	#define PE 1
 #elif (App == 0x621202BC ) //Vanquish DGVoodoo2
@@ -1883,20 +1904,21 @@ static const int FOV = 0;                               //Set Game FoV
 	#define RH 1
 	#define NF 1
 #elif (App == 0x4551A746 ) //The Swapper
-	#define DB_X 1
-	#define DF_Y 0.025
-	#define DA_X 0.0425
-	#define DA_Y 62.5
-	#define DB_Y 1
+	//#define DB_X 1
+	#define DF_Y 0.0125
+	#define DA_X 0.05
+	#define DA_Y 99.0
+	#define DA_Z -0.010
+	#define DB_Y 4
 	#define DE_X 1
 	#define DE_Y 0.500
 	#define DE_Z 0.375
-	#define DF_Z 1.0
-	#define DD_X 0.800
-	#define DD_Y 0.705
-	#define DD_Z 0.250
-	#define DD_W 0.4125
-	#define SP 1
+	//#define DF_Z 1.0
+	//#define DD_X 0.800
+	//#define DD_Y 0.705
+	//#define DD_Z 0.250
+	//#define DD_W 0.4125
+	//#define SP 1
 	#define DS 1
 	#define RH 1
 #elif (App == 0xE0B7AF16 ) //Horizon Chase Turbo
@@ -2304,6 +2326,7 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DB_Y 4
 	#define DE_X 2
 	#define DE_Y 0.225
+	#define DG_Z 0.41125
 #elif (App == 0x9FAEA815 ) //Amnesia Rebirth
 	#define DA_Y 15.0
 	#define DA_Z 0.0002
@@ -2315,26 +2338,26 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DE_Z 0.400
 #elif (App == 0x491EA19E ) //Cyberpunk 2077
 	#define DA_W 1
-	#define DA_Y 70.0
-	#define DA_Z 0.00010
-	#define DA_X 0.050
+	#define DA_Y 72.5
+	#define DA_Z -0.00010
+	#define DA_X 0.05125
 	#define DB_Z 0.150
-	#define DF_Y 0.05125
+	#define DF_Y 0.05
 	#define DB_Y 2 //?? Auto Mode didn't work well in this game.
 	#define DE_X 3
 	#define DE_Y 0.500
-	#define DE_Z 0.400
+	#define DE_Z 0.4375
 	#define DB_W 34
 	#define DF_X 0.20
-	#define DG_W 0.15
+	#define DG_W 0.08
 	#define BM 1
-	#define DG_X 0.1375
+	#define DG_X 0.130
 	#define PE 1
 #elif (App == 0xB53B8500 ) //DEATH STRANDING
 	#define DA_W 1
 	#define DA_Y 20.0
 	#define DA_Z 0.000375
-	#define DA_X 0.055
+	#define DA_X 0.05
 	//#define DB_Z 0.125
 	#define DF_Y 0.01
 	#define DB_Y 4
@@ -2377,6 +2400,119 @@ static const int FOV = 0;                               //Set Game FoV
 	#define RH 1
 	#define WSM 2
 	#define DB_W 2
+#elif (App == 0xFC960068 ) //Devolverland Expo
+	#define DA_W 1
+	#define DA_Y 30.0
+	#define DA_X 0.050
+	#define DB_Z 0.050
+	#define DB_Y 5
+	#define DE_X 3
+	#define DE_Y 0.50
+	#define DE_Z 0.375
+	#define WSM 2
+	#define DB_W 3
+	#define PE 1
+	#define DA 1
+#elif (App == 0x59DA13F1 ) //Conarium
+	#define DA_W 1
+	#define DA_Y 18.75
+	#define DA_X 0.0875
+	#define DF_Y 0.0328125
+	#define DB_Z 0.075
+	#define DB_Y 3
+	#define DE_X 3
+	#define DE_Y 0.525
+	#define DE_Z 0.400
+	#define DG_Z 0.305
+	#define DG_W 0.0875 //Allow much popout "Please don't abuse this."
+	#define PE 1
+	#define DA 1
+	#define RH 1
+	#define WSM 2
+	#define DB_W 4
+	#define DF_X 0.150
+#elif (App == 0xCE21A723 ) //Bully Scholarship Edition
+	#define DA_Y 13.0
+	#define DA_X 0.070
+	#define DE_X 1
+	#define DE_Y 0.5
+	#define DE_Z 0.375
+	#define DG_Z 0.360
+	#define BM 1
+	#define DG_X 0.1375
+	#define DS 1
+	#define FV 1
+#elif (App == 0x289ABD5C ) //World Rally Championship 10
+	#define DA_W 1
+	#define DA_Y 20.5
+	//#define DA_Z 0.000075
+	#define DA_X 0.1375
+	#define DF_Y 0.03
+	#define DB_Y 4
+	#define DE_X 1
+	#define DE_Y 0.055
+	#define DE_Z 0.4875
+	#define WSM 2
+	#define DB_W 5
+	#define DF_X 0.125
+	#define PE 1
+	#define DA 1
+#elif (App == 0xBCCAD1AE || App == 0x3D2B24D7 ) //Project Cars | Project Cars 2
+	#define DA_Y 7.0
+	//#define DA_Z 0.000075
+	#define DA_X 0.16875
+	//#define DF_Y 0.01
+	//#define DB_Y 4
+	#define DE_X 1
+	#define DE_Y 0.375
+	#define DE_Z 0.400
+	#define DG_Z 0.125 //0.125//0.3125
+	#define DE_W 0.275//0.275//0.35625
+	#define DG_W 0.20 // Needed for old car.
+	#define BM 1
+	#define DG_X 0.165
+	#define PE 1
+	#define DA 1
+	#define DS 1
+	#define NW 1
+#elif (App == 0x98C69E31 || App == 0xA8778B7D ) // F1 2019 | F1 2020 DX12
+	#define DA_W 1
+	#define DG_W 0.25
+	#define DA_Y 14.5
+	#define DA_X 0.07
+	#define DB_Y 5
+	#define DE_X 2
+	#define DE_Z 0.400
+	#define DG_Z 0.400
+	#define PE 1
+	#define NW 1
+#elif (App == 0x164EF6B5 ) //Grid 2019
+	#define DA_W 1
+	#define DA_Y 11.5
+	#define DA_X 0.15875
+	#define DE_X 1
+	//#define DE_Y 0.50
+	#define DE_Z 0.400
+	//#define DG_Z 0.125 
+	//#define DE_W 0.275
+	#define DG_W 0.25
+	#define BM 1
+	#define DG_X 0.1625
+	#define PE 1
+	#define DA 1
+	//#define DS 1
+	#define NW 1
+#elif (App == 0x54568EA ) //Assetto Corsa
+	#define DA_X 0.05
+	#define DB_Y 4
+	#define DE_X 1
+	#define DE_Y 0.750
+	#define DE_Z 0.375
+	#define DG_W 0.2
+	#define PE 1
+	#define DA 1
+	#define NW 1
+    #define FV 1
 #else
 	#define NP 1 //No Profile
 #endif
@@ -2447,7 +2583,7 @@ static const int FOV = 0;                               //Set Game FoV
 #ifndef DE_W
     #define DE_W Weapon_Near_Depth_Max_D
 #endif
-// X = [ZPD Weapon Boundary] Y = [Separation] Z = [Edge Masking] W = [HUD]
+// X = [ZPD Weapon Boundary] Y = [Separation] Z = [Null] W = [HUD]
 #ifndef DF_X
     #define DF_X ZPD_Weapon_Boundary_Adjust
 #endif
@@ -2455,7 +2591,7 @@ static const int FOV = 0;                               //Set Game FoV
     #define DF_Y Separation
 #endif
 #ifndef DF_Z
-    #define DF_Z Edge_Masking
+    #define DF_Z Null_Z
 #endif
 #ifndef DF_W
     #define DF_W HUDX_D
@@ -2542,7 +2678,7 @@ static const int FOV = 0;                               //Set Game FoV
 #ifndef OW_WP     //This is used if OW_WP is not called in the Above Profile
     #define OW_WP "WP Off\0Custom WP\0WP 0\0WP 1\0WP 2\0WP 3\0WP 4\0WP 5\0WP 6\0WP 7\0WP 8\0WP 9\0WP 10\0WP 11\0WP 12\0WP 13\0WP 14\0WP 15\0WP 16\0WP 17\0WP 18\0WP 19\0WP 20\0WP 21\0WP 22\0WP 23\0WP 24\0WP 25\0WP 26\0WP 27\0WP 28\0WP 29\0WP 30\0WP 31\0WP 32\0WP 33\0WP 34\0WP 35\0WP 36\0WP 37\0WP 38\0WP 39\0WP 40\0WP 41\0WP 42\0WP 43\0WP 44\0WP 45\0WP 46\0WP 47\0WP 48\0WP 49\0WP 50\0WP 51\0WP 52\0WP 53\0WP 54\0WP 55\0WP 56\0WP 57\0WP 58\0WP 59\0WP 60\0WP 61\0WP 62\0WP 63\0WP 64\0WP 65\0WP 66\0WP 67\0WP 68\0WP 69\0WP 70\0WP 71\0WP 72\0WP 73\0WP 74\0"
 #endif
-#ifndef WSM //One is Profiles List A | Two is Profiles List B | Three is MCC | Four is Prey | Five is Blood 2 WIP
+#ifndef WSM //One is Profiles List A | Two is Profiles List B | Three is MCC | Four is Prey | Five is Blood 2
     #define WSM 1 //Weapon Setting Mode
 #endif
 
@@ -2557,7 +2693,7 @@ float3 Weapon_Profiles(float WP ,float3 Weapon_Adjust) //Tried Switch But, can't
     if (WP == 5)
         Weapon_Adjust = float3(0.284,10.5,0.8725);    //WP 3  | BorderLands 3
     if (WP == 6)
-        Weapon_Adjust = float3(0.253,39.0,98.125);    //WP 4  | Fallout 4
+        Weapon_Adjust = float3(0.253,39.0,97.5);      //WP 4  | Fallout 4
     if (WP == 7)
         Weapon_Adjust = float3(0.276,20.0,9.5625);    //WP 5  | Skyrim: SE
     if (WP == 8)
@@ -2617,9 +2753,9 @@ float3 Weapon_Profiles(float WP ,float3 Weapon_Adjust) //Tried Switch But, can't
     if (WP == 35)
         Weapon_Adjust = float3(0.278,37.50,9.1);      //WP 33 | Black Mesa
     if (WP == 36)
-        Weapon_Adjust = float3(0.420,4.75,1.0);       //WP 34 | Blood 2
+        Weapon_Adjust = float3(0.0,0.0,0.0);          //WP 34 | Game
     if (WP == 37)
-        Weapon_Adjust = float3(0.500,4.75,0.75);      //WP 35 | Blood 2 Alt
+        Weapon_Adjust = float3(0.0,0.0,0.0);          //WP 35 | Game
     if (WP == 38)
         Weapon_Adjust = float3(0.78,21.25,0.1875);    //WP 36 | SOMA
     if (WP == 39)
@@ -2706,11 +2842,11 @@ float3 Weapon_Profiles(float WP ,float3 Weapon_Adjust) //Could reduce from 76 to
 {   if (WP == 2)
         Weapon_Adjust = float3(0.6,6.5,0.0);          //WP 0  | The Suicide of Rachel Foster
     if (WP == 3)
-        Weapon_Adjust = float3(0.0,0.0,0.0);          //WP 1  | Game
+        Weapon_Adjust = float3(1.653,17.5,0.0);       //WP 1  | Devolverland Expo
     if (WP == 4)
-        Weapon_Adjust = float3(0.0,0.0,0.0);          //WP 2  | Game
+        Weapon_Adjust = float3(1.489,16.875,0.0);     //WP 2  | Conarium
     if (WP == 5)
-        Weapon_Adjust = float3(0.0,0.0,0.0);          //WP 3  | Game
+        Weapon_Adjust = float3(0.270,25.0,0.951);     //WP 3  | WRC 10
     if (WP == 6)
         Weapon_Adjust = float3(0.0,0.0,0.0);          //WP 4  | Game
     if (WP == 7)
@@ -2881,6 +3017,18 @@ float3 Weapon_Profiles(float WP ,float3 Weapon_Adjust) // Prey 2017
 		Weapon_Adjust = float3(0.2832,31.25,0.8775); //WP 0 | Prey 2017 High Settings and <
 	if (WP == 3)
 		Weapon_Adjust = float3(0.2832,31.25,0.91875);//WP 1 | Prey 2017 Very High
+
+	return Weapon_Adjust;
+}
+#elif WSM == 5
+float3 Weapon_Profiles(float WP ,float3 Weapon_Adjust) // Blood 2
+{
+    if (WP == 2)
+        Weapon_Adjust = float3(0.4213,5.0,0.5);        //WP 0 | Blood 2 All Weapons
+    if (WP == 3)
+        Weapon_Adjust = float3(0.484,5.0,0.5);         //WP 1 | Blood 2 Bonus weapons
+    if (WP == 4)
+        Weapon_Adjust = float3(0.4213,5.0,0.8);        //WP 2 | Blood 2 Former
 
 	return Weapon_Adjust;
 }

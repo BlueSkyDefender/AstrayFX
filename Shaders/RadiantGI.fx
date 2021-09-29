@@ -57,7 +57,7 @@
 // Unlimited Blur Filter
 // - Paul Dang
 //   http://blog.marmakoide.org/?p=1
-//   https://github.com/spite/Wagner/blob/master/fragment-shaders/box-blur-fs.glsl [MIT] 
+//   https://github.com/spite/Wagner/blob/master/fragment-shaders/box-blur-fs.glsl [MIT]
 //   https://github.com/Brimson/reshaders/blob/master/shaders/cBlur.fx
 //
 // If I missed any please tell me.
@@ -299,7 +299,7 @@ uniform float GI_Ray_Length <
 	ui_type = "drag";
 	ui_min = 1.0; ui_max = 500; ui_step = 1;
 	ui_label = "General Ray Length";
-	ui_tooltip = "General GI Ray Length is used to increase the Sampling Radius.\n" //Marty didn't want me using Ray Length. But, this is easyer for normies to understand. 
+	ui_tooltip = "General GI Ray Length is used to increase the Sampling Radius.\n" //Marty didn't want me using Ray Length. But, this is easyer for normies to understand.
 				 "The byproduc of this causes the ray casting distance to extend.\n" //So I opted for keeping the name and explaining it for the user.
 			     "This scales automatically with multi level detail."; // So the name not 100% correct. But, it's close enough.
 	ui_category = "PCGI";
@@ -489,7 +489,7 @@ uniform float Blend <
     ui_category = "Image";
 > = 0.5;
 #else
-uniform int BM <
+uniform int Blend <
 	ui_type = "combo";
     ui_label = "Blend Mode";
     ui_tooltip = "Use this to change the look of GI when applied to the final image.";
@@ -507,7 +507,7 @@ uniform float GI_Power <
 	ui_category = "Image";
 > = 1.0;
 //Lord of Lunacy says white power would be bad.
-uniform float GI_LumaPower < 
+uniform float GI_LumaPower <
 
 	ui_type = "slider";
 	ui_min = 0.0; ui_max = 1.0;
@@ -733,7 +733,7 @@ static const float2 PoissonTaps[13] = { float2(-0.326,-0.406), //This Distributi
 										float2(-0.322,-0.933),
 										float2(-0.792,-0.598),
 										float2(-0.255, 0.464) };
-										
+
 float fmod(float a, float b)
 {
 	float c = frac(abs(a / b)) * abs(b);
@@ -766,7 +766,7 @@ float3 softlight(float3 c, float3 b) 	{ return b<0.5f ? (2.0f*c*b+c*c*(1.0f-2.0f
 float3 add(float3 c, float3 b) 	{ return c + (b * 0.5);}
 //Enhace Shadows
 //float3 Shadows( float3 color )
-//{	
+//{
 //    float3 distribution = pow( 1.0f - color.rgb, 4.0f ), SH = color.rgb * ( distribution * shadows ) * ( 1.0f - color.rgb );
 //    return saturate( color.rgb + SH );
 //}
@@ -1126,17 +1126,17 @@ float Depth_Info(float2 texcoord)
 }
 
 float SUMTexture_lookup(float2 TC, float dx, float dy)
-{   float Depth = 1-Depth_Info( TC ); 
+{   float Depth = 1-Depth_Info( TC );
 		  Depth = (Depth - 0)/ (lerp(1,10,saturate(1-PCGI_2DTexture_Detail)) - 0);
     float2 uv = (TC.xy + float2(dx , dy ) * pix);
     float3 c = tex2Dlod( BackBufferPCGI, float4(uv.xy,0, 0) ).rgb * 0.5;
-	
+
 	// return as luma
     return (0.2126*c.r + 0.7152*c.g + 0.0722*c.b) * Depth * 0.00666f;
 }
 
 float3 TextureNormals(float2 UV, float Depth)
-{  
+{
 	if(saturate(PCGI_2DTexture_Detail) > 0)
 	{
 		// simple sobel edge detection
@@ -1147,7 +1147,7 @@ float3 TextureNormals(float2 UV, float Depth)
 	    dx +=  1.0 * SUMTexture_lookup(UV,  2.0, -2.0);
 	    dx +=  2.0 * SUMTexture_lookup(UV,  2.0,  0.0);
 	    dx +=  1.0 * SUMTexture_lookup(UV,  2.0,  2.0);
-	    
+
 	    float dy = 0.0;
 	    dy += -1.0 * SUMTexture_lookup(UV, -2.0, -2.0);
 	    dy += -2.0 * SUMTexture_lookup(UV,  0.0, -2.0);
@@ -1160,7 +1160,7 @@ float3 TextureNormals(float2 UV, float Depth)
 			  edge *= edge;
 
 		float angle = atan2(dx,dy);
-		
+
 		float X = edge * sin(angle); //X= -X;
 		float Y = edge * sin(angle + 7.5 * PI / 3.);// Adjust me to rotate Normals
 		float Z = edge * (X - Y);
@@ -1231,7 +1231,7 @@ float3 UnpackNormals(float2 enc)
 }
 
 float4 Normals_Depth(float2 texcoords, float Mips)
-{	
+{
 	float Depth = tex2Dlod(PCGIcurrNormalsDepth,float4(texcoords,0,Mips)).z;
 	float3 Normals = UnpackNormals(tex2Dlod(PCGIcurrNormalsDepth,float4(texcoords,0,Mips)).xy);
 	return float4(Normals,Depth);
@@ -1317,12 +1317,12 @@ float4 BBColor(float2 texcoords, int Mips)
 }
 
 float4 DirectLighting(float2 texcoords , int Mips)
-{   float MDC = DepthMDC(texcoords, 0), Sky_Quality = lerp(Mips,SkyMipLeves[min(6,Sky_Adustment)],MDC);	
+{   float MDC = DepthMDC(texcoords, 0), Sky_Quality = lerp(Mips,SkyMipLeves[min(6,Sky_Adustment)],MDC);
 	float4 BC = BBColor(texcoords, Sky_Quality);
 	if(HDR_BP > 0)
 		BC.rgb = inv_Tonemapper(float4(BC.rgb,1-HDR_BP));
 	float  GS = Luma(BC.rgb), Boost = 1;
-	
+
 		if(Target_Lighting >= 0)
 		{
 		   BC.rgb /= GS;
@@ -1333,9 +1333,9 @@ float4 DirectLighting(float2 texcoords , int Mips)
 		   BC.rgb /= 1-GS;
 		   BC.rgb *= 1-saturate(GS + lerp(0.0,0.5,saturate(abs(Target_Lighting))));
 		}
-			
+
 		   Boost = lerp(1.0,2.5,saturate(abs(Target_Lighting)));
-	
+
 	return float4(Saturator_A(BC.rgb * Boost, DepthMDC(texcoords, 0) , Normals_Depth(texcoords, 0).w),BC.a);
 }
 
@@ -1438,7 +1438,7 @@ void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Glo
 	rl_gi_sss.xy *= MultiPattern(stexcoords.xy).y ? 0.75 : 0.375 ; //In hear for keeping the look of 2.9.6
 	float MaskDir = saturate( dot(float3(0,1,0),Normals_Depth(texcoords, 0).xyz) ), Diffusion = lerp(1.0,lerp(1+Reflectivness.y,1.0,abs(Reflectivness.x)), MaskDir );
 	rl_gi_sss.xy *= Reflectivness.x < 0 ? Diffusion : MultiPattern(stexcoords.xy).y ? 1 : Diffusion;
-	//Basic depth rescaling from Near to Far 
+	//Basic depth rescaling from Near to Far
 	float D0 = smoothstep(-NCD.x,1, depth ), D1 = smoothstep(-1,1, depth ), N_F = lerp(GI_Fade * 2,0, 1-D ), MDCutOff = smoothstep(0,1,D) > MaxDepth_CutOff;//smoothstep(0,saturate(GI_Fade),D);
 	//SSS, GI, Gloss, and AO Form Factor code look above
 	[fastopt] // Dose this even do anything better vs unroll? Compile times seem the same too me. Maybe this will work better if I use the souls I collect of the users that use this shader?
@@ -1492,7 +1492,7 @@ void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Glo
 float4 GI_Adjusted(float2 TC, int Mip)
 {
 	float4 ConvertGI = tex2Dlod( PCGI_Info, float4( TC , 0, Mip)) , ConvertSS = tex2Dlod( PCSS_Info, float4( TC , 0, Mip));
-	
+
 	ConvertGI.xyz = RGBtoYCbCr(ConvertGI.xyz);
 	ConvertGI.x *= GI_LumaPower.x;
 	ConvertGI.xyz = Saturator_C(YCbCrtoRGB( ConvertGI.xyz));
@@ -1522,7 +1522,7 @@ void CBReconstruction(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, ou
 
 float3 GI(float2 TC, float Mips)
 {
-	#line 1337 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info² Tampered¿½"
+	#line 1337 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info ¿½ Tampered"
 	#warning ""
 	float3 GI_Out = tex2Dlod( PCGIReconstruction_Info, float4( TC * GI_Res , 0, Mips)).xyz ;
 	return GetPos() ? GI_Out * TC.xyx : GI_Out;
@@ -1560,7 +1560,7 @@ float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Targe
 	//float2 A = PastTexcoords > 1., B = PastTexcoords < 0.;
 	//TAA Mixing for real motion buffer.......
 	// float Mixing = any(float2(any(A), any(B))) ? 1 : 0;
-	
+
 	//float diff = length(antialiased - preclamping) * 4;//Alternet way of doing it
 	//Added Velocity Clamping.......
 	float3 clampAmount = abs(Past - CurrAOGI); //V_Buffer;//For AO But,I Droped this and use MixRate;
@@ -1580,7 +1580,7 @@ void AccumulatedFramesGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD,
 }
 //Horizontal Denoising Upscaling
 float4 BGU_Hoz(float4 position : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
-{   
+{
 	return float4( Denoise( PCGIaccuFrames          , texcoords, EvenSteven[clamp(SamplesXY,0,20)], 0, 2.5 ).rgb, 0);
 }
 //Vertical Denoising Upscaling
@@ -1593,15 +1593,15 @@ float3 Composite(float3 Color, float3 Cloud)
 {
 	float3 Output, FiftyGray = Cloud + 0.5;
 	//Left for Rework
-	//FiftyGray = Shadows(FiftyGray);	
+	//FiftyGray = Shadows(FiftyGray);
 	#if Controlled_Blend
 		Output = add( lerp( overlay( Color,  FiftyGray), softlight( Color,  FiftyGray),Blend),Cloud * 0.1875);
 	#else
-	if(BM == 0)
+	if(Blend == 0)
 		Output = add( lerp( overlay( Color,  FiftyGray), softlight( Color,  FiftyGray), 0.5 ),Cloud * 0.1875);
-	else if(BM == 1)
+	else if(Blend == 1)
 		Output = overlay( Color, FiftyGray);
-	else if(BM == 2)
+	else if(Blend == 2)
 		Output = softlight( Color, FiftyGray);
 	else
 		Output = add( Color, Cloud );
@@ -1621,7 +1621,7 @@ float3 DiffusionBlur(float2 texcoords)
 		  SD = 1-SkinDetection(tex2Dlod(PCGIcurrColor,float4(texcoords,0,2)) ),
 		  NormalBlurFactor = 1.0f,
 		  DepthBlurFactor = 0.009f;
-		  
+
 	float4 StoredNormals_Depth = Normals_Depth( texcoords, 0);
 
 	if(SD && Scattering && ML && Diffusion_Saturation_Power.x > 0 )
@@ -1634,7 +1634,7 @@ float3 DiffusionBlur(float2 texcoords)
 
 			float2 offsetxy = texcoords + float2( DBoffsets[i], 0) * pix * lerp( 0.0, 2.0,saturate(Diffusion_Saturation_Power.x));
 			float3 CMix =  Mix( offsetxy ).rgb;
-			
+
 				float4 ModifiedNormals_Depth = Normals_Depth( offsetxy, 2);//Use lower mip level here on finnished product.
 				float ModN = length(StoredNormals_Depth.xyz - ModifiedNormals_Depth.xyz), ModD = saturate( StoredNormals_Depth.w - ModifiedNormals_Depth.w);
 
@@ -1657,10 +1657,10 @@ float3 DiffusionBlur(float2 texcoords)
 float4 MixOut(float2 texcoords)
 {
 	//float2 Grid = floor( texcoords * float2(BUFFER_WIDTH, BUFFER_HEIGHT ) * pix * 125);//125 lines
-	float  Depth = Normals_Depth(texcoords,0).w, FakeAO = Debug == 1 || Depth_Guide ? ( Depth + 
-				   Normals_Depth(texcoords + float2(pix.x * 2,0),1).w + 
-				   Normals_Depth(texcoords + float2(-pix.x * 2,0),2).w + 
-				   Normals_Depth(texcoords + float2(0,pix.y * 2),Depth_Guide ? 3 : 8).w  + 
+	float  Depth = Normals_Depth(texcoords,0).w, FakeAO = Debug == 1 || Depth_Guide ? ( Depth +
+				   Normals_Depth(texcoords + float2(pix.x * 2,0),1).w +
+				   Normals_Depth(texcoords + float2(-pix.x * 2,0),2).w +
+				   Normals_Depth(texcoords + float2(0,pix.y * 2),Depth_Guide ? 3 : 8).w  +
 				   Normals_Depth(texcoords + float2(0,-pix.y * 2),Depth_Guide ? 4 : 10) ).w * 0.2 : 0;
 	float3 Output = tex2D( PCGI_BGUVertical_Sample, texcoords).rgb, Layer = DiffusionBlur( texcoords ); float4 Done = float4(Layer,0.5);
 	if(Debug == 0)
@@ -2198,7 +2198,7 @@ ui_tooltip = "Beta: Global Illumination Secondary Output.Â²"; >
 // So Made every thing a little faster. But, also changed many default setting and added correct staturation control.I also changed the way denoise works with the image.
 // Added support for Lord of Lunacy VRS "Variable Rate Shading." VRS works better the more samples you use.Sadly VRS auto lower res areas don't work due to the newly added
 // checkerboard reconstruction.This Preping it rework for next release. Removed Pure GI mode since it complicated things.Added Sky Color Contribution. Lets the sky scatter
-// on to the world based on Direction. I do hope this update make things better to use. I also tried to make SSS easier by automating luminace clipping. 
+// on to the world based on Direction. I do hope this update make things better to use. I also tried to make SSS easier by automating luminace clipping.
 //
 // For the next release I will be reworking the Denoiser / TAA 100% Thank you Robloxian AKA Clown Comp AKA Brimsion on GitHubs on the interwebs.
 //
@@ -2206,7 +2206,7 @@ ui_tooltip = "Beta: Global Illumination Secondary Output.Â²"; >
 //
 // Mini Update Adjusting the Denoiser so it gives a sharper image out.Thank you Lord of Lunacy.
 //
-// Update 2.9.8 
+// Update 2.9.8
 //
 // Perf update based on a blured Luma Map. This uses lower samples in areas that are darker. Temporal Mask was also added to TAA. It replace the old Mixing system.
 // This was done too reduce the noise in the final image. I also made it sample from Lower MipLeves when lowering Resolution. This seems to reduce noise overall.
@@ -2222,9 +2222,9 @@ ui_tooltip = "Beta: Global Illumination Secondary Output.Â²"; >
 // Update 3.0.0
 //
 // Emissive Mode added! It lets the shader make all objects emissive based on approximated information from the emitter's luminace information. This adjusted Form Factor can
-// be used to allow emissive light mirror what on the opposite side. Simple and effective option for older games. Also added back Trimming that was removed back in an later update. 
+// be used to allow emissive light mirror what on the opposite side. Simple and effective option for older games. Also added back Trimming that was removed back in an later update.
 // The two options do effect Directional Sky Color. But, mitagations where added to help prevent this.
-// 
+//
 // Update 3.0.2
 //
 // DX 9 workaround................ it works.... I think.
