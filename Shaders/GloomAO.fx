@@ -3,7 +3,7 @@
 //-----------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 4.0+ SSDO Ver 0.2.1
+//For Reshade 4.0+ SSDO Ver 0.2.3
 //-----------------------------
 //                                                                Screen Space Directional Occlusion
 //
@@ -110,7 +110,8 @@
 #define Text_Info_Key 93       //Menu Key            Text Information Key Default 93 is the Menu Key. You can use this site https://keycode.info to pick your own.
 #define Disable_Debug_Info 0   //[Off | On]          Use this to disable help information that gives you hints for fixing many games with Overwatch.fxh.
 #define Minimize_Web_Info 0    //[Off | On]          Use this to minimize the website logo on startup.
-#define Force_Texture_Details 0//[Off | On]          This is used to add Texture Detail AO into SSDO output.
+#define Force_Texture_Details 0//[Off | On]          This is used to add Texture Detail AO into SSDO output. WIP
+#define SSDO_Buffer_Size 2     //   [1-2]            You can use this to set the resolution of the main SSDO Buffer.
 
 //Help / Guide Information stub uniform a idea from LucasM
 uniform int GloomAO <
@@ -127,9 +128,7 @@ uniform int GloomAO <
 	ui_label = " ";
 	ui_type = "radio";
 >;
-
-//uniform float TEST < ui_type = "slider"; ui_min = 0; ui_max = 1; > = 1.0;
-
+//uniform float3 TEST < ui_type = "slider"; ui_min = 0; ui_max = 1; > = 1.0;
 uniform int SSDO_MipSampling <
 	ui_type = "combo";
 	ui_items = "Full Resolution\0Half Resolution\0Quarter Resolution\0Full Resolution Adptive\0Half Resolution Adaptive\0Quarter Resolution Adaptive\0";
@@ -167,14 +166,15 @@ uniform float SSDO_2DTexture_Detail <
 #else
 static const int SSDO_2DTexture_Detail = 0;
 #endif
-uniform float NCD <
+uniform float2 NCD <
 	ui_type = "slider";
 	ui_min = 0.0; ui_max = 1.0;
-	ui_label = "Depth Hands Adjust";
-	ui_tooltip = "Lets you adjust detail of objects near the cam like for the Weapon Hand in game that fall out of range.\n"
-			     "Defaults is [Weapon Hand 0.0]";
+	ui_label = "Near Details";
+	ui_tooltip = "Lets you adjust detail of objects near the cam and or like weapon hand AO.\n"
+			     "The 2nd Option is for Weapon Hands in game that fall out of range.\n"
+			     "Defaults are [Near Details X 0.125] [Weapon Hand Y 0.0]";
 	ui_category = "SSDO";
-> = 0.0;
+> = float2(0.125,0.0);
 
 uniform float SSDO_Trimming <
 	ui_type = "slider";
@@ -245,6 +245,14 @@ uniform float SSDO_Saturation <
     ui_tooltip = "Applys color saturation to the indriect bounce of light.";
 	ui_category = "Image";
 > = 1.0;
+
+uniform float SSDO_Intensity_Masking <
+	ui_type = "slider";
+    ui_min = 0.0; ui_max = 1.0;
+    ui_label = "Intensity Mask";
+    ui_tooltip = "Mask out intense light sources from receiving AO.";
+	ui_category = "Image";
+> = 0.0;
 
 uniform int Depth_Map <
 	ui_type = "combo";
@@ -439,18 +447,11 @@ sampler SamplerDepthSSDO
 	Texture = texDepthSSDO;
 };
 
-texture texSSDO { Width = BUFFER_WIDTH / 2 ; Height = BUFFER_HEIGHT / 2; Format = RGBA8; MipLevels = 2; };
+texture texSSDO { Width = BUFFER_WIDTH / SSDO_Buffer_Size; Height = BUFFER_HEIGHT / SSDO_Buffer_Size; Format = RGBA8; MipLevels = 2; };
 
 sampler SamplerSSDO
 {
 	Texture = texSSDO;
-};
-
-texture texMedianSSDO { Width = BUFFER_WIDTH / 2 ; Height = BUFFER_HEIGHT / 2; Format = RGBA8; };
-
-sampler SamplerMedianSSDO
-{
-	Texture = texMedianSSDO;
 };
 
 texture texCEAGD_H_SSDO { Width = BUFFER_WIDTH / 2; Height = BUFFER_HEIGHT / 2; Format = RGBA8; };
@@ -460,7 +461,7 @@ sampler SamplerSSDOH
 	Texture = texCEAGD_H_SSDO;
 };
 
-texture texCEAGD_V_SSDO { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT / 2; Format = RGBA8; };
+texture texCEAGD_V_SSDO { Width = BUFFER_WIDTH ; Height = BUFFER_HEIGHT; Format = RGBA8; };
 
 sampler SamplerSSDOV
 {
@@ -632,26 +633,17 @@ float fmod(float a, float b)
 	return a < 0 ? -c : c;
 }
 
-float BayerLikePattern(float2 texcoords)
-{
-	//Basic Bayer like pattern. Used for 3 levels of Rays. Color names are a hold over for pattern.
-	float2 grid = floor(float2(texcoords.x * BUFFER_WIDTH , texcoords.y * BUFFER_HEIGHT ) );
-	float GB = fmod(grid.x+grid.y,2.0) ? 1 : 0;
-	float GR = fmod(grid.x+grid.y,2.0) ? 0.75 : 0.25;
-	return fmod(grid.x,2.0) ? GR : GB;
-}
-
 float MCNoise(float2 TC,float FC ,float seed)
 {   //This is the noise I used for rendering
 	float motion = FC, a = 12.9898, b = 78.233, c = 43758.5453, dt = dot(TC.xy + 0.5, float2(a,b)), sn = fmod(dt,PI + seed) * motion;
 	return frac( sin( sn ) * c );
 }   int T_01() { return 12500; }
 
-float gNoise(float FC ,float2 pos)
-{   //This is the noise I used for rendering
-	float motion = FC;
-	const float3 kValue = float3(52.9829189, 0.06711056, 0.00583715) + (fmod( FC ,666) * 0.00000001) ;
-    return  frac(kValue.x * frac(dot(pos, kValue.yz))) ;
+#define Scale SSDO_Buffer_Size
+float Interleaved_Gradient_Noise(float2 TC)
+{   //Magic Numbers
+    float3 MNums = float3(0.06711056, 0.00583715, 52.9829189);
+    return frac( MNums.z * frac(dot(TC,MNums.xy)) );
 }
 
 #if BD_Correction || DC
@@ -699,14 +691,14 @@ float Depth_Info(float2 texcoord)
 		texcoord.y =  1 - texcoord.y;
 
 	//Conversions to linear space.....
-	float zBuffer = tex2Dlod(ZBufferSSDO, float4(texcoord,0,0)).x, zBufferWH = zBuffer, Far = 1.0, Near = 0.125/Depth_Map_Adjust, NearWH = 0.125/(Depth_Map ? NCD : 10*NCD), OtherSettings = Depth_Map ? NCD : 100 * NCD; //Near & Far Adjustment
+	float zBuffer = tex2Dlod(ZBufferSSDO, float4(texcoord,0,0)).x, zBufferWH = zBuffer, Far = 1.0, Near = 0.125/Depth_Map_Adjust, NearWH = 0.125/(Depth_Map ? NCD.y : 10*NCD.y), OtherSettings = Depth_Map ? NCD.y : 100 * NCD.y ; //Near & Far Adjustment
 	//Man Why can't depth buffers Just Be Normal
 	float2 C = float2( Far / Near, 1.0 - Far / Near ), Z = Offset < 0 ? min( 1.0, zBuffer * ( 1.0 + abs(Offset) ) ) : float2( zBuffer, 1.0 - zBuffer ), Offsets = float2(1 + OtherSettings,1 - OtherSettings), zB = float2( zBufferWH, 1-zBufferWH );
 
 	if(Offset > 0 || Offset < 0)
 	Z = Offset < 0 ? float2( Z.x, 1.0 - Z.y ) : min( 1.0, float2( Z.x * (1.0 + Offset) , Z.y / (1.0 - Offset) ) );
 
-	if (NCD > 0)
+	if (NCD.y > 0)
 	zB = min( 1, float2( zB.x * Offsets.x , zB.y / Offsets.y  ));
 
 	if (Depth_Map == 0)
@@ -720,13 +712,13 @@ float Depth_Info(float2 texcoord)
 		zBufferWH = Far * NearWH / (Far + zB.y * (NearWH - Far));
 	}
 
-	return  saturate( lerp(NCD > 0 ? zBufferWH : zBuffer,zBuffer,0.925) );
-}   int T_02() { return 25000; }
+	return  saturate( lerp(NCD.y > 0 ? zBufferWH : zBuffer,zBuffer,0.925) );
+}  int T_02() { return 25000; }
 #if Force_Texture_Details
 void SSDOColors(float4 vpos : SV_Position, float2 texcoords : TEXCOORD,
 						out float4 Colors : SV_Target0)
-{
-		Colors = float4(tex2D(BackBufferSSDO,texcoords).rgb,1);
+{	   float Intensity = 1-dot(0.333,tex2Dlod(BackBufferSSDO,float4(texcoords,0,0)).xyz) > lerp(0.0,0.5,SSDO_Intensity_Masking);
+		Colors = float4(tex2D(BackBufferSSDO,texcoords).rgb, Intensity);
 }
 #endif
 float2 PackNormals(float3 n)
@@ -736,7 +728,7 @@ float2 PackNormals(float3 n)
 }
 
 float SUMTexture_lookup(float2 TC, float dx, float dy)
-{   float Depth = 1-Depth_Info( TC ); 
+{   float Depth = 1-Depth_Info( TC );
 		  Depth = (Depth - 0)/ (lerp(1,10,saturate(1-SSDO_2DTexture_Detail)) - 0);
     float2 uv = (TC.xy + float2(dx , dy ) * pix);
     float3 c = tex2Dlod( SamplerColorsSSDO, float4(uv.xy,0, 0) ).rgb * 0.5;
@@ -746,7 +738,7 @@ float SUMTexture_lookup(float2 TC, float dx, float dy)
 }
 
 float3 TextureNormals(float2 UV, float Depth)
-{  
+{
 	if(saturate(SSDO_2DTexture_Detail) > 0)
 	{
 		// simple sobel edge detection
@@ -757,7 +749,7 @@ float3 TextureNormals(float2 UV, float Depth)
 	    dx +=  1.0 * SUMTexture_lookup(UV,  1.5, -1.5);
 	    dx +=  2.0 * SUMTexture_lookup(UV,  1.5,  0.0);
 	    dx +=  1.0 * SUMTexture_lookup(UV,  1.5,  1.5);
-	    
+
 	    float dy = 0.0;
 	    dy += -1.0 * SUMTexture_lookup(UV, -1.5, -1.5);
 	    dy += -2.0 * SUMTexture_lookup(UV,  0.0, -1.5);
@@ -770,7 +762,7 @@ float3 TextureNormals(float2 UV, float Depth)
 			  edge *= edge;
 
 		float angle = atan2(dx,dy);
-		
+
 		float X = edge * sin(angle); X = -X;
 		float Y = edge * sin(angle + 7.5 * PI / 3.);// Adjust me to rotate Normals
 		float Z = edge * (X - Y);
@@ -848,11 +840,12 @@ void NormalsColorsDepth(float4 vpos : SV_Position, float2 texcoords : TEXCOORD,
 	float3 Enormal = cross(P2 - P0, P1 - P0);
 	 Enormal.x = -Enormal.x;
 
-	 Enormal = normalize(lerp( normal + TextureNormals(texcoords, depth), Enormal, distance(Enormal,normal) >= 1.0));
+	 Enormal = lerp( normal + TextureNormals(texcoords, depth), Enormal,  distance( normalize(normal), normalize(Enormal) ) >= 0.7f );
 
-	Normals = PackNormals(Enormal);
+	Normals = PackNormals(normalize(Enormal));
 	#if !Force_Texture_Details
-	Colors = float4(tex2D(BackBufferSSDO,texcoords).rgb,1);
+	float Intensity = 1-dot(0.333,tex2Dlod(BackBufferSSDO,float4(texcoords,0,0)).xyz) > lerp(0.0,0.5,SSDO_Intensity_Masking);
+	Colors = float4(tex2D(BackBufferSSDO,texcoords).rgb, Intensity);
 	#endif
 	Depth = depth;
 }
@@ -884,10 +877,10 @@ float2 Rotate2D( float2 r, float l )
 float3 GetPosition(float2 texcoords,float2 raycoords,float Depth, float FDepth)
 {
 	// Compute Correct Pos
-	return float3(float2(raycoords.x-texcoords.x,texcoords.y-raycoords.y) * (Depth + 0.001), Depth - FDepth);
+	return float3(float2(raycoords.x-texcoords.x,texcoords.y-raycoords.y) * Depth, Depth - FDepth);
 }   int nonplus() { return T_01() == 0 || T_02() == 0 ? 1 : 0;}
 
-float3 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
+float4 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 {
 	int SSDO_Samples = clamp(SSDO_Levels,1,64);
 	float SSDO_SRM = SSDO_SampleRadius,
@@ -899,10 +892,10 @@ float3 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 		   Noise.z = MCNoise( texcoords , 1, 3 );
 	// Use Random Noise
 		   random = normalize(Noise);
-	float ILuma = Luma(tex2Dlod(SamplerColorsSSDO,float4(texcoords,0,3)).xyz) * 2.0;
+	float ILuma = Luma(tex2Dlod(SamplerColorsSSDO,float4(texcoords,0,4.5)).xyz) * 2.0;
 	float4 SSDO, Normals_Depth = NDSampler(texcoords, 0);
-
-	float D0 = smoothstep(-1.0,1.0,Normals_Depth.w),D_Fade = SSDO_Fade > 0 ? lerp(1-SSDO_Fade * 2,0, 1-Normals_Depth.w ) : smoothstep(0,abs(SSDO_Fade),Normals_Depth.w);
+	float IGN = Interleaved_Gradient_Noise(floor( texcoords.xy / pix / Scale));
+	float D0 = smoothstep(-NCD.x,1.0,Normals_Depth.w),D_Fade = SSDO_Fade > 0 ? lerp(1-SSDO_Fade * 2,0, 1-Normals_Depth.w ) : smoothstep(0,abs(SSDO_Fade),Normals_Depth.w);
 	int Mip_Switch = SSDO_MipSampling == 4 || SSDO_MipSampling == 5 ? 1 : 0;
 	//[fastop]
 	for (int i = 1.0; i <= SSDO_Samples; i++)
@@ -912,9 +905,9 @@ float3 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 
 		if(Normals_Depth.w > SSDO_Max_Depth)
 			continue;
-
-		//Dumb Magic combo Noise.... Ended up liking this for some damn reason.
-		float2 RayDir = (pix * (SSDO_SRM/SSDO_Samples)) * gNoise( 1, vpos.xy) * Rotate2D( POISSON_SAMPLES[i], random.x ) / D0; // tossed out reflect(coord,random) Because Sampled Mips didn't work with the code above.... May need Yakube to fix this.
+		//Dumb Magic combo Noise.... Ended up liking this for some damn reason. ////normalize(frac(float2(IGN*BUFFER_WIDTH,IGN*BUFFER_HEIGHT)*i)*2.0-1.0)
+		float2 RayDir  = (pix * (SSDO_SRM/SSDO_Samples)) * max(0.125f,IGN) * Rotate2D( POISSON_SAMPLES[i], random.x ) / D0; // tossed out reflect(coord,random) Because Sampled Mips didn't work with the code above.... May need Yakube to fix this.
+			   RayDir *= sign(dot(normalize(float3(RayDir.x,-RayDir.y,1.0)),Normals_Depth.xyz)); // flip directions
 
 		float2 RayCoords = texcoords + RayDir.xy;
 		int Adaptive_Mipping = SSDO_MipSampling <= 2 ? SSDO_MipSampling : lerp(SSDO_MipSampling == 5 ? 3 : 2, Mip_Switch ? 1 : 0, Normals_Depth.w);
@@ -944,7 +937,7 @@ float3 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 	}
 
 	SSDO /= SSDO_Samples;
-	return saturate(1.0-SSDO.rgb);
+	return float4(saturate(1.0-SSDO.rgb),1);
 }
 
 float NormalMask(float2 texcoords,float Mip)
@@ -958,27 +951,6 @@ float3 SSDO_MipBLur(sampler Tex, float2 texcoords,float Mip)
 	return tex2Dlod(Tex, float4(texcoords, 0, Mip)).rgb;
 }
 
-// 3-tap median filter
-float4 Median_FF(float4 a, float4 b, float4 c)
-{
-    return a + b + c - min(min(a, b), c) - max(max(a, b), c);
-}
-
-float4 Median(sampler Tex, float2 texcoords )
-{   float Mip = 0.5f;
-    float4 s0 = tex2Dlod(Tex, float4(texcoords, 0, 0)),
-    s1 = tex2Dlod(Tex, float4(texcoords - float2(pix.x,0), 0, Mip)),
-    s2 = tex2Dlod(Tex, float4(texcoords + float2(pix.x,0), 0, Mip)),
-    s3 = tex2Dlod(Tex, float4(texcoords - float2(0,pix.y), 0, Mip)),
-    s4 = tex2Dlod(Tex, float4(texcoords + float2(0,pix.y), 0, Mip));
-    return Median_FF(Median_FF(s0, s1, s2), s3, s4);
-}
-
-float4 Median_Filter_SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
-{
-    return Median(SamplerSSDO,texcoords);//Used to reduce Salt and Pepper Noise
-}
-
 static const float EvenSteven[21] = { 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20 , 22, 24, 26, 28, 30, 32, 34, 36, 38, 40}; // It's not odd...
 
 float gaussian(float x, float sigma)
@@ -989,9 +961,9 @@ float gaussian(float x, float sigma)
 float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
 {
 	float4 StoredNormals_Depth = NDSampler( texcoords, 0);//Fix 2nd option by using the 2D texture Mask form the Normals from 2D.
-	float4 center = tex2D(Tex,texcoords), color = 0.0;//Like why do SmoothNormals when 2nd Level Denoiser is like Got you B#*@!........
-	float total = 0.0, NormalBlurFactor = Debug == 1 ? 0.125f : 1.0f, DepthBlurFactor = 0.0125f,  DM = smoothstep(0,1,StoredNormals_Depth.w) > 0.999;
-	R += lerp(2.0,Debug == 1 ? 0.0 : 2.0,NormalMask(texcoords,2.0));
+	float4 center = tex2Dlod(Tex, float4(texcoords ,0, 0)), color = 0.0;//Like why do SmoothNormals when 2nd Level Denoiser is like Got you B#*@!........
+	float total = 0.0, NormalBlurFactor = Debug == 1 ? 0.1f : 1.0f, DepthBlurFactor = 0.0125f,  DM = smoothstep(0,1,StoredNormals_Depth.w) > 0.999;
+
 	if(SXY > 0) // Who would win Raw Boi or Gaussian Boi
 	{   [fastopt]
 	    for (int i = -SXY * 0.5; i <= SXY * 0.5; ++i)
@@ -1008,7 +980,7 @@ float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
 			float Weight = gaussian(i, sqrt(SXY));//Looks better
 			Weight *= d_w;
 			Weight *= n_w;
-			color += tex2Dlod(Tex, float4(TC ,0, 0)) * Weight;
+			color += tex2Dlod(Tex, float4(TC ,0, 0.5)) * Weight;
         	total += Weight;
 
     	}
@@ -1018,7 +990,7 @@ float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
 
 float4 CEAGD_H_SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 {
-	return pow(abs(Denoise(SamplerMedianSSDO,texcoords, EvenSteven[clamp(SamplesXY,0,20)], 0, 2.5 )),SSDO_Power);
+	return pow(abs(Denoise(SamplerSSDO,texcoords, EvenSteven[clamp(SamplesXY,0,20)], 0, 2.5 )),SSDO_Power);
 }
 
 float4 CEAGD_V_SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
@@ -1107,8 +1079,8 @@ float4 SSDOMixing(float2 texcoords )
 													NDSampler(texcoords + float2( 0        , pix.y * 2), 3).w +
 													NDSampler(texcoords + float2( 0        ,-pix.y * 2), 4).w   ) * 0.2f : 0.00000001f;
 	//Mip Denoiser
-	float3 ssdo = lerp(SSDO_MipBLur( SSDOaccuFrames, texcoords,2),SSDO_MipBLur( SSDOaccuFrames, texcoords,0),NormalMask(texcoords,1));
-
+	float3 ssdo = SSDO_MipBLur( SSDOaccuFrames, texcoords,0.0);//lerp(SSDO_MipBLur( SSDOaccuFrames, texcoords,2),SSDO_MipBLur( SSDOaccuFrames, texcoords,0),NormalMask(texcoords,1));
+	float Intencity_Mask = tex2Dlod(SamplerColorsSSDO,float4(texcoords,0,2.5)).w;
 	if(smoothstep(0,1,Depth) > SSDO_Max_Depth)
 		ssdo = 1;
 	float3 Noise = float3(MCNoise( texcoords , 1, 1 ), MCNoise( texcoords , 1, 2 ), MCNoise( texcoords , 1, 3 ));
@@ -1119,10 +1091,10 @@ float4 SSDOMixing(float2 texcoords )
 	else
 		ssdo = saturate(Saturator(ssdo));
 
-	float3 Layer = Composite(tex2D(SamplerColorsSSDO,texcoords).xyz,ssdo);
+	float3 Layer = lerp(Composite(tex2D(SamplerColorsSSDO,texcoords).xyz,ssdo),tex2D(SamplerColorsSSDO,texcoords).xyz,1-Intencity_Mask) ;
 
 	if (Debug == 1)
-		return float4(ssdo ,1.0) ;
+		return float4(lerp(ssdo, tex2D(SamplerColorsSSDO,texcoords).xyz,1-Intencity_Mask) ,1.0) ;
 	else if (Debug == 2)
 		return float4(texcoords.x + texcoords.y < 1 ? NDSampler( texcoords, 0).w : NDSampler( texcoords, 0).xyz * 0.5 + 0.5,1.0);
 	else
@@ -1473,12 +1445,6 @@ technique SSDO_Plus
 		VertexShader = PostProcessVS;
 		PixelShader = SSDO;
 		RenderTarget = texSSDO;
-	}
-		pass SSDO_Median
-	{
-		VertexShader = PostProcessVS;
-		PixelShader = Median_Filter_SSDO;
-		RenderTarget = texMedianSSDO;
 	}
 		pass SSDO_EADFDDS
 	{
