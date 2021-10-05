@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 3.0.2
+//For Reshade 3.0+ PCGI Ver 3.0.3
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -600,7 +600,14 @@ uniform int SamplesXY <
 				 "This also has the side effect of smoothing out the image so you get that Normal Like Smoothing.\n"
 				 "Default is 7 and you can override this a bit.";
 	ui_category = "Extra Options";
-> = 7;
+> = 6;
+
+uniform bool IGN_Toggle <
+	ui_label = "Interleaved Gradient Noise";
+	ui_tooltip = "In the on position it uses Interleaved Gradient Noise in stead of Regular Noise.";
+	ui_category = "Extra Options";
+> = true;
+
 #if DB_Size_Position || SP == 2
 uniform float2 Horizontal_and_Vertical <
 	ui_type = "drag";
@@ -755,6 +762,12 @@ float MCNoise(float FC ,float2 TC,float seed)
 	float motion = FC, a = 12.9898, b = 78.233, c = 43758.5453, dt = dot(TC.xy + 0.5, float2(a,b)), sn = fmod(dt,PI + seed);
 	return frac(frac(sin(sn) * c) + 0.71803398875f * motion);
 }   int T_01() { return 12500; }
+
+float Interleaved_Gradient_Noise(float2 TC)
+{   //Magic Numbers
+    float3 MNums = float3(0.06711056, 0.00583715, 52.9829189);
+    return frac( MNums.z * frac(dot(TC,MNums.xy)) );
+}
 
 float gaussian(float x, float sigma)
 {
@@ -1165,7 +1178,7 @@ float3 TextureNormals(float2 UV, float Depth)
 		float Y = edge * sin(angle + 7.5 * PI / 3.);// Adjust me to rotate Normals
 		float Z = edge * (X - Y);
 
-		return min(1,lerp(float3(X,Y,Z) * Depth, 0, float3(X,Y,Z) == 0.5));
+		return min(1,lerp(float3(X,Y,Z), 0, float3(X,Y,Z) == 0.5));
 	}
 	else
 		return 0;
@@ -1440,22 +1453,23 @@ void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Glo
 	rl_gi_sss.xy *= Reflectivness.x < 0 ? Diffusion : MultiPattern(stexcoords.xy).y ? 1 : Diffusion;
 	//Basic depth rescaling from Near to Far
 	float D0 = smoothstep(-NCD.x,1, depth ), D1 = smoothstep(-1,1, depth ), N_F = lerp(GI_Fade * 2,0, 1-D ), MDCutOff = smoothstep(0,1,D) > MaxDepth_CutOff;//smoothstep(0,saturate(GI_Fade),D);
+	float4 IGN = IGN_Toggle ? Interleaved_Gradient_Noise(stexcoords / pix / 2) * 2 - 1 : random;
 	//SSS, GI, Gloss, and AO Form Factor code look above
 	[fastopt] // Dose this even do anything better vs unroll? Compile times seem the same too me. Maybe this will work better if I use the souls I collect of the users that use this shader?
 	for (int i = 0; i <= Samples; i++)
-	{ //VRS and Max Depth Exclusion...... every ms counts.........
-		#if DX9
-		if( MDCutOff || clock == 0 || texcoords.x > 1.0 || texcoords.y > 1.0 )
+	{ 
+		#if DX9 //DX 9 issues......
+		if( clock == 0 || texcoords.x > 1.0 || texcoords.y > 1.0 )
 			discard;
-		#else
+		#else //VRS and Max Depth Exclusion...... every ms counts.........
 		if( MDCutOff || clock == 0 || texcoords.x > 1.0 || texcoords.y > 1.0 )
 			break;
 		#endif
 		//Evenly distributed points on Poisson Disk.... But, with High Frequency noise.
-		float2 GIWH = (pix * rl_gi_sss[0]) * random[0] * Rotate2D_A( PoissonTaps[i], random[3], texcoords) / D0,
-			   //GDWH = (pix * rl_gi_sss[1]) * random[1] * Rotate2D_B( PoissonTaps[i], random[2]) / D0,
-			   SSWH = (pix * rl_gi_sss[2]) * random[2] * Rotate2D_B( PoissonTaps[i], random[1]) / D1,
-			   TCWH = (pix * rl_gi_sss[3]) * random[3] * Rotate2D_B( PoissonTaps[i], random[0]) / D1;
+		float2 GIWH = (pix * rl_gi_sss[0]) * IGN[0] * Rotate2D_A( PoissonTaps[i], random[3], texcoords) / D0,
+			   //GDWH = (pix * rl_gi_sss[1]) * IGN[1] * Rotate2D_B( PoissonTaps[i], random[2]) / D0,
+			   SSWH = (pix * rl_gi_sss[2]) * IGN[2] * Rotate2D_B( PoissonTaps[i], random[1]) / D1,
+			   TCWH = (pix * rl_gi_sss[3]) * IGN[3] * Rotate2D_B( PoissonTaps[i], random[0]) / D1;
 		//Recever to Emitter vector
 			ddiff_tc = GetPosition( texcoords + TCWH) - p;
 		//Thiccness Form Factor
@@ -2228,5 +2242,12 @@ ui_tooltip = "Beta: Global Illumination Secondary Output.²"; >
 // Update 3.0.2
 //
 // DX 9 workaround................ it works.... I think.
+//
+// Update 3.0.3
+//
+// DX 9 Sky fixed: No More Ghosts
+// Added Interleaved Gradient Noise as default on option. Gives the GI a smoother look when denoising. Because of this I lowered default Defnoise power to 6...
+// Also added an Experimental Texture Details option.
+// Now even your crevices can have GI................
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
