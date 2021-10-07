@@ -1,7 +1,7 @@
 ////----------------------------------------//
 ///SuperDepth3D Overwatch Automation Shader///
 //----------------------------------------////
-// Version 2.0.9
+// Version 2.1.0
 //---------------------------------------OVERWATCH---------------------------------------//
 // If you are reading this stop. Go away and never look back. From this point on if you  //
 // still think it's is worth looking at this..... Then no one can save you or your soul. //
@@ -2393,17 +2393,19 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DA 1
 #elif (App == 0x87AC1510 ) //Ghostrunner
 	#define DA_W 1
-	#define DA_Y 250.0
+	#define DA_Y 245.0
 	#define DA_Z 0.0000025 // Magic
-	#define DA_X 0.0401
+	#define DA_X 0.0451
 	#define DF_Y 0.001     // Magic
-	#define DB_Z 0.045
+	#define DB_Z 0.05
 	#define DB_Y 1
+	#define BM 1
+	#define DG_X 0.1825
 	#define DE_X 3
-	#define DE_Y 0.750
-	#define DE_Z 0.375
+	#define DE_Y 0.650
+	#define DE_Z 0.400
 	#define DB_W 43
-	#define DF_X 0.05
+	#define DF_X 0.1
 	#define PE 1
 	#define DA 1
 #elif (App == 0x11E6C55E ) //The Suicide of Rachel Foster
