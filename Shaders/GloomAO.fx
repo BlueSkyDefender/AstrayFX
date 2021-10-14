@@ -3,7 +3,7 @@
 //-----------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 4.0+ SSDO Ver 0.2.3
+//For Reshade 4.0+ SSDO Ver 0.2.5
 //-----------------------------
 //                                                                Screen Space Directional Occlusion
 //
@@ -183,15 +183,6 @@ uniform float SSDO_Trimming <
     ui_tooltip = "Use this to limit the local falloff of the ao in the image also known as Depth Range Check.";
 	ui_category = "SSDO";
 > = 0.1;
-/* //Disable in code.
-uniform float SSDO_AngleThreshold <
-	ui_type = "slider";
-    ui_min = 0.0; ui_max = 1.0; ui_step = 0.01;
-    ui_label = "Angle Bias";
-    ui_tooltip = "AO Bias adjustment that set the minimum angle whitch AO will be applyed to.";
-	ui_category = "SSDO";
-> = 0.25;
-*/
 uniform float SSDO_Fade <
 	ui_type = "slider";
     ui_min = -2.0; ui_max = 2.0;
@@ -883,18 +874,12 @@ float3 GetPosition(float2 texcoords,float2 raycoords,float Depth, float FDepth)
 float4 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 {
 	int SSDO_Samples = clamp(SSDO_Levels,1,64);
-	float SSDO_SRM = SSDO_SampleRadius,
+	float SSDO_SRM = SSDO_SampleRadius, SSDO_AngleThreshold = 1.0,
 		  SSDO_Contribution_Range = SSDO_SRM*pix.x*max(SSDO_Trimming,0.001);//simple scale for aka "Zthiccness."
 	const float ATTF = 1e-5; // attenuation factor
-	float3 Noise, random;// Access Noise
-		   Noise.x = MCNoise( texcoords , 1, 1 );
-		   Noise.y = MCNoise( texcoords , 1, 2 );
-		   Noise.z = MCNoise( texcoords , 1, 3 );
-	// Use Random Noise
-		   random = normalize(Noise);
+	float random = MCNoise( texcoords , 1, 1 ) * 2 - 1, IGN = Interleaved_Gradient_Noise(floor( texcoords.xy / pix / Scale));
 	float ILuma = Luma(tex2Dlod(SamplerColorsSSDO,float4(texcoords,0,4.5)).xyz) * 2.0;
 	float4 SSDO, Normals_Depth = NDSampler(texcoords, 0);
-	float IGN = Interleaved_Gradient_Noise(floor( texcoords.xy / pix / Scale));
 	float D0 = smoothstep(-NCD.x,1.0,Normals_Depth.w),D_Fade = SSDO_Fade > 0 ? lerp(1-SSDO_Fade * 2,0, 1-Normals_Depth.w ) : smoothstep(0,abs(SSDO_Fade),Normals_Depth.w);
 	int Mip_Switch = SSDO_MipSampling == 4 || SSDO_MipSampling == 5 ? 1 : 0;
 	//[fastop]
@@ -906,7 +891,7 @@ float4 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 		if(Normals_Depth.w > SSDO_Max_Depth)
 			continue;
 		//Dumb Magic combo Noise.... Ended up liking this for some damn reason. ////normalize(frac(float2(IGN*BUFFER_WIDTH,IGN*BUFFER_HEIGHT)*i)*2.0-1.0)
-		float2 RayDir  = (pix * (SSDO_SRM/SSDO_Samples)) * max(0.125f,IGN) * Rotate2D( POISSON_SAMPLES[i], random.x ) / D0; // tossed out reflect(coord,random) Because Sampled Mips didn't work with the code above.... May need Yakube to fix this.
+		float2 RayDir  = (pix * (SSDO_SRM/SSDO_Samples)) * IGN * Rotate2D( POISSON_SAMPLES[i], IGN ) / D0; // tossed out reflect(coord,random) Because Sampled Mips didn't work with the code above.... May need Yakube to fix this.
 			   RayDir *= sign(dot(normalize(float3(RayDir.x,-RayDir.y,1.0)),Normals_Depth.xyz)); // flip directions
 
 		float2 RayCoords = texcoords + RayDir.xy;
@@ -928,12 +913,12 @@ float4 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 		float3 Pos = GetPosition(  texcoords, RayCoords, Normals_Depth.w - ATTF, vsFetch.w + ATTF);
 		float3 normalizedPos = normalize(Pos);
 
-		//float  AO  = smoothstep(0,SSDO_AngleThreshold,dot(normalizedPos,Normals_Depth.xyz));
-		float  AO  = max(0.0,dot(normalizedPos,Normals_Depth.xyz));
+		float  AO  = smoothstep(0,SSDO_AngleThreshold,dot(normalizedPos,Normals_Depth.xyz));
+		//float  AO  = max(0.0,dot(normalizedPos,Normals_Depth.xyz));
 			   AO *= sign( length(Normals_Depth.xyz-vsFetch.xyz) );
 		// Listed as attenuation......
 		float SSDO_RangeCheck = max(0.0,SSDO_Contribution_Range-length(Pos))/SSDO_Contribution_Range;
-		SSDO += lerp(saturate(1-LocalGI) * AO * SSDO_RangeCheck,0,D_Fade);
+		SSDO += lerp(saturate(1-LocalGI) * AO * SSDO_RangeCheck * SSDO_RangeCheck,0,D_Fade);
 	}
 
 	SSDO /= SSDO_Samples;
@@ -962,7 +947,7 @@ float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
 {
 	float4 StoredNormals_Depth = NDSampler( texcoords, 0);//Fix 2nd option by using the 2D texture Mask form the Normals from 2D.
 	float4 center = tex2Dlod(Tex, float4(texcoords ,0, 0)), color = 0.0;//Like why do SmoothNormals when 2nd Level Denoiser is like Got you B#*@!........
-	float total = 0.0, NormalBlurFactor = Debug == 1 ? 0.1f : 1.0f, DepthBlurFactor = 0.0125f,  DM = smoothstep(0,1,StoredNormals_Depth.w) > 0.999;
+	float total = 0.0, NormalBlurFactor = Debug == 1 ? 0.125f : 0.5f, DepthBlurFactor = 0.0125f,  DM = smoothstep(0,1,StoredNormals_Depth.w) > 0.999;
 
 	if(SXY > 0) // Who would win Raw Boi or Gaussian Boi
 	{   [fastopt]
