@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 3.0.3
+//For Reshade 3.0+ PCGI Ver 3.0.4
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -146,7 +146,7 @@
 #define Disable_Debug_Info 0   //[Off | On]          Use this to disable help information that gives you hints for fixing many games with Overwatch.fxh.
 #define Minimize_Web_Info 0    //[Off | On]          Use this to minimize the website logo on startup.
 #define ForcePool 0            //[Off | On]          Force Pooled Textures in versions 4.9.0+ If you get a black screen turn this too off. Seems to be a ReShade Issue.
-#define Force_Texture_Details 0//[Off | On]          This is used to add Texture Detail AO into PCGI output.
+#define Force_Texture_Details 1//[Off | On]          This is used to add Texture Detail AO into PCGI output.
 
 
 //RadiantGI In menu Options
@@ -276,23 +276,12 @@ uniform int RadiantGI <
 	ui_type = "radio";
 >;
 //uniform float TEST < ui_type = "slider"; ui_min = 0.0; ui_max = 1; ui_label = "TEST"; > = 1;
-
-uniform float GI_Res <
-	ui_type = "slider";
-	ui_min = 0.5; ui_max = 1;// ui_step = 0.1;
-	ui_label = "Resolution";
-	ui_tooltip = "GI Resolution is used too increase performance at the cost of quality.\n"
-				 "Larger adjustments from default will reduce noise and vice versa.\n"
-				 "Default is automaticly adjusted based on current resolution.";
-	ui_category = "PCGI";
-> = RSRes;
-
 uniform float samples <
 	ui_type = "slider";
 	ui_min = 4; ui_max = 12; ui_step = 1;
 	ui_label = "Samples";
 	ui_tooltip = "GI Sample Quantity is used to increase samples amount as a side effect this reduces noise.";
-	ui_category = "PCGI";
+	ui_category = "Global Illumination";
 > = 6;
 
 uniform float GI_Ray_Length <
@@ -302,40 +291,18 @@ uniform float GI_Ray_Length <
 	ui_tooltip = "General GI Ray Length is used to increase the Sampling Radius.\n" //Marty didn't want me using Ray Length. But, this is easyer for normies to understand.
 				 "The byproduc of this causes the ray casting distance to extend.\n" //So I opted for keeping the name and explaining it for the user.
 			     "This scales automatically with multi level detail."; // So the name not 100% correct. But, it's close enough.
-	ui_category = "PCGI";
-> = 250;
-
-#if Force_Texture_Details
-uniform float PCGI_2DTexture_Detail <
-	ui_type = "slider";
-	ui_min = 0.0; ui_max = 1.0;
-	ui_label = "Texture Details";
-	ui_tooltip = "Lets you add Texture Details to PCGI so you can have GI on 2D information.\n"
-			     "Defaults is [0.0] Off";
-	ui_category = "PCGI";
-> = 0.0;
-#else
-static const int PCGI_2DTexture_Detail = 0;
-#endif
+	ui_category = "Global Illumination";
+> = 125;
 
 uniform float Trim <
 	ui_type = "slider";
 	ui_min = 0.0; ui_max = 1.0;
-	ui_label = "Trimming";
+	ui_label = "Trim";
 	ui_tooltip = "Trim GI by limiting how far the GI is able to effect the objects around them.\n"
 				 "Directional Sky Color is negatively impacted by this option.\n"
 			     "Default is [0.50] and Zero is Off.";
-	ui_category = "PCGI";
+	ui_category = "Global Illumination";
 > = 0.5;
-
-uniform float D_Irradiance <
-	ui_type = "slider";
-	ui_min = 0.0; ui_max = 1.0;
-	ui_label = "Distance Irradiance";
-	ui_tooltip = "Distance Irradiance Lets you control Irradiance that comes from the Refracted Light from distant ground.\n"
-			     "Default is [0.0] and Zero is Off.";
-	ui_category = "PCGI";
-> = 0.0;
 
 uniform float Target_Lighting <
 	ui_type = "slider";
@@ -344,7 +311,7 @@ uniform float Target_Lighting <
 	ui_tooltip = "Lets you target the Direct Lighting and/or Indirect Lighting specifically, so the shader can use your adjustment for its own GI calculations.\n"
 			     "Negative values target Indirect lighting and positive values target direct lighting in the image./n"
 				 "Defaults is [0.05] and Zero is full image sampling.";
-	ui_category = "PCGI";
+	ui_category = "Global Illumination";
 > = 0.05;
 
 uniform float2 NCD <
@@ -354,7 +321,7 @@ uniform float2 NCD <
 	ui_tooltip = "Lets you adjust detail of objects near the cam and or like weapon hand GI.\n"
 			     "The 2nd Option is for Weapon Hands in game that fall out of range.\n"
 			     "Defaults are [Near Details X 0.125] [Weapon Hand Y 0.0]";
-	ui_category = "PCGI";
+	ui_category = "Global Illumination";
 > = float2(0.125,0.0);
 
 uniform float GI_Fade < //Blame the pineapple for this option.
@@ -364,7 +331,7 @@ uniform float GI_Fade < //Blame the pineapple for this option.
 	ui_tooltip = "GI Application Power that is based on Depth scaling for controlled fade In-N-Out.\n" //That's What A Hamburger's All About
 			     "Can be set from 0 to 1 and is Set to Zero for No Culling.\n"
 			     "Default is 0.0.";
-	ui_category = "PCGI";
+	ui_category = "Global Illumination";
 > = 0.0;
 
 uniform float2 Reflectivness <
@@ -373,15 +340,8 @@ uniform float2 Reflectivness <
 	ui_label = "Diffusion Amount";
 	ui_tooltip = "This basicly adds control for how defused the lighting should look on the ground.\n"
 			     "Default is [1.0 | 0.0]. One is Max Diffusion and the value is length.";
-	ui_category = "PCGI";
+	ui_category = "Global Illumination";
 > = float2(1.0,0.0);
-
-uniform bool Sky_Contribution <
-	ui_label = "Directional Sky Color";
-	ui_tooltip = "Lets you use Sky Color Information to contribute too your game.\n"
-			     "Default is Off.";
-	ui_category = "PCGI";
-> = false;
 
 uniform bool Emissive_Mode <
 	ui_label = "Emissive Mode";
@@ -389,14 +349,14 @@ uniform bool Emissive_Mode <
 				 "Directional Sky Color is negatively impacted by this option.\n"
 			 	"This also makes GI less accurate.\n"
 			     "Default is Off.";
-	ui_category = "PCGI";
+	ui_category = "Global Illumination";
 > = false;
 
 uniform bool Scattering<
-	ui_label = "Subsurface Scattering";
+	ui_label = "Subsurface Light Transport";
 	ui_tooltip = "Enable The Subsurface Light Transport Function to create a Subsurface Scattering effect.\n"
 			     "Default is Off.";
-	ui_category = "SSLT";
+	ui_category = "Subsurface Scattering";
 > = false;
 
 uniform float Wrap <
@@ -405,7 +365,7 @@ uniform float Wrap <
 	ui_label = "Upper Scattering";
 	ui_tooltip = "Control the Light Wrap Form Factor to adjust the Subsurface Scattering effect.\n"
 			     "Default is [0.5].";
-	ui_category = "SSLT";
+	ui_category = "Subsurface Scattering";
 > = 0.5;
 /*
 uniform float User_SSS_Luma <
@@ -424,7 +384,7 @@ uniform float Deep_Scattering <
 	ui_label = "Deep Scattering";
 	ui_tooltip = "Control Thickness Estimation Form Factor to create a Deep Tissue Scattering effect.\n"
 			     "Default is [0.1].";
-	ui_category = "SSLT";
+	ui_category = "Subsurface Scattering";
 > = 0.1;
 uniform float Luma_Map <
 	ui_type = "slider";
@@ -432,7 +392,7 @@ uniform float Luma_Map <
 	ui_label = "Tissue Luma Map";
 	ui_tooltip = "Controls the Luma Map that lets bright lights approximate deep penotration of the tissue.\n" //So Deep....
 			     "Default is [0.5].";
-	ui_category = "SSLT";
+	ui_category = "Subsurface Scattering";
 > = 0.5;
 uniform float3 Internals < // We are all pink and fleshy on the inside?
 	ui_type = "color";
@@ -440,7 +400,7 @@ uniform float3 Internals < // We are all pink and fleshy on the inside?
 	ui_label = "Internal Flesh Color";
 	ui_tooltip = "Since I can't tell what the internal color of the Deep Tissue you need to set this your self for RGB.\n"
 			     "Defaults are [R 0.25] [B 0.0] [G 0.0] [L 0.5].";
-	ui_category = "SSLT";
+	ui_category = "Subsurface Scattering";
 > = float3(0.54,0.01,0.01);
 
 uniform float2 Diffusion_Saturation_Power <
@@ -450,8 +410,8 @@ uniform float2 Diffusion_Saturation_Power <
 	ui_tooltip = "Diffusion Blur is used too softens the lighting and makes the person a little more realistic by mimicking this effect skin has on light.\n"
 			     "Simulate light diffusion favor red blurring over other colors.\n"
 			     "Default are [0.5] [0.5].";
-	ui_category = "SSLT";
-> = 0.5;
+	ui_category = "Subsurface Scattering";
+> = float2(0.25,0.5);
 
 #if LutSD //Man............................................
 uniform float2 SSS_Seek <
@@ -473,11 +433,58 @@ uniform float SSS_Seek <
 				 "You can get this LUT @ https://github.com/BlueSkyDefender/AstrayFX/wiki/Subsurface-Light-Transport\n"
 			     "Default is [0.25].";
 #endif
-	ui_category = "SSLT";
+	ui_category = "Subsurface Scattering";
 #if LutSD
 > = float2(0.25,0.5);
 #else
 > = 0.25;
+#endif
+
+uniform bool Sky_Contribution <
+	ui_label = "Directional Sky Color";
+	ui_tooltip = "Lets you use Sky Color Information to contribute too your game.\n"
+			     "Default is Off.";
+	ui_category = "Supplemental Contributions";
+> = false;
+
+uniform float GI_Sky_Saturation <
+	ui_type = "slider";
+	ui_min = 0.0; ui_max = 5.0;
+	ui_label = "Sky Saturation";
+	ui_tooltip = "Sky Color Saturation.\n"
+			     "Default is [Power 1.0].";
+	ui_category = "Supplemental Contributions";
+> = 1.0;
+
+uniform int Sky_Adustment <
+    ui_type = "slider";
+    ui_min = 0; ui_max = 6;
+    ui_label = "Sky Color Averaging";
+    ui_tooltip = "This lets you Average the sky color so you can have general color.";
+	ui_category = "Supplemental Contributions";
+> = 3;
+
+uniform float D_Irradiance <
+	ui_type = "slider";
+	ui_min = 0.0; ui_max = 1.0;
+	ui_label = "Distance Irradiance";
+	ui_tooltip = "Distance Irradiance Lets you control Irradiance that comes from the Refracted Light from distant ground.\n"
+			     "Default is [0.0] and Zero is Off.";
+	ui_category = "Supplemental Contributions";
+> = 0.0;
+
+#if Force_Texture_Details
+uniform float2 PCGI_2DTexture_Detail <
+	ui_type = "slider";
+	ui_min = 0.0; ui_max = 1.0;
+	ui_label = "Texture Details & Falloff";
+	ui_tooltip = "Lets you add Texture Details to PCGI so you can have added 2D texture information applyed to the GI.\n"
+				 "Turn this on by adjusting the first slider and then adjusting it's falloff with the second.\n"
+			     "Defaults are [0.0,0.5] and Zero is Off";
+	ui_category = "Supplemental Contributions";
+> = float2(0.0,1.0);
+#else
+static const int2 PCGI_2DTexture_Detail = 0;
 #endif
 
 #if Controlled_Blend
@@ -516,22 +523,14 @@ uniform float GI_LumaPower <
 			     "Default is [0.5].";
 	ui_category = "Image";
 > = 0.5;
-uniform float2 Saturation <
+uniform float GI_Saturation <
 	ui_type = "slider";
 	ui_min = 0.0; ui_max = 5.0;
-	ui_label = "GI Saturation & Sky Saturation";
-	ui_tooltip = "Irradiance Map Saturation and Sky Color Saturation.\n"
-			     "Default is [Power 0.5 | 1.0].";
+	ui_label = "GI Saturation";
+	ui_tooltip = "Irradiance Map Saturation.\n"
+			     "Default is [Power 0.5].";
 	ui_category = "Image";
-> = float2(0.5, 1.0);
-
-uniform int Sky_Adustment <
-    ui_type = "slider";
-    ui_min = 0; ui_max = 6;
-    ui_label = "Sky Color Averaging";
-    ui_tooltip = "This lets you Average the sky color so you can have general color.";
-	ui_category = "Image";
-> = 3;
+> = 0.5;
 /*
 uniform float shadows <
     ui_type = "slider";
@@ -546,9 +545,9 @@ uniform float HDR_BP <
 	ui_min = 0.0; ui_max = 1.0;
 	ui_label = "HDR Extraction Power";
 	ui_tooltip = "Use This to adjust the HDR Power, You can override this value and set it to like 1.5 or something.\n"
-				 "Dedault is 0.5 and Zero is Off.";//Because new HDR extraction works well now.
+				 "Dedault is Zero and is Off.";//Because new HDR extraction works well now.
 	ui_category = "Image";
-> = 0.5;
+> = 0.0;
 
 uniform int Depth_Map <
 	ui_type = "combo";
@@ -601,6 +600,16 @@ uniform int SamplesXY <
 				 "Default is 7 and you can override this a bit.";
 	ui_category = "Extra Options";
 > = 6;
+
+uniform float GI_Res <
+	ui_type = "slider";
+	ui_min = 0.5; ui_max = 1;// ui_step = 0.1;
+	ui_label = "Resolution";
+	ui_tooltip = "GI Resolution is used too increase performance at the cost of quality.\n"
+				 "Larger adjustments from default will reduce noise and vice versa.\n"
+				 "Default is automaticly adjusted based on current resolution.";
+	ui_category = "Extra Options";
+> = RSRes;
 
 uniform bool IGN_Toggle <
 	ui_label = "Interleaved Gradient Noise";
@@ -709,6 +718,12 @@ uniform float clock < source = "timer"; >;             // A timer that starts wh
 texture TexName < source =  LUT_File_Name; > { Width =  Tile_SizeXY *  Tile_Amount; Height =  Tile_SizeXY ; };
 sampler Sampler { Texture =  TexName; };
 #endif
+
+float2 Saturation()
+{
+	return  float2(GI_Saturation,GI_Sky_Saturation);
+}
+
 float2 GIRL()
 {
 	return  float2(GI_Ray_Length,250);
@@ -877,11 +892,11 @@ float3 HSLToRGB( in float3 HSL )
 }
 
 float3 Saturator_A(float3 C, float Depth_Mask,float DD)//DD is Distance Dimming so that Sky irradiance has prefrence.
-{   float Mask = 1-Depth_Mask, Sat = Debug == 2 ? 0.0 : Saturation.x, Distance_Irradiance = lerp(0.5,1.0,saturate(D_Irradiance)), DDMasked = lerp(1-saturate((DD-Distance_Irradiance)/(1-Distance_Irradiance)),1,DD * Depth_Mask);
+{   float Mask = 1-Depth_Mask, Sat = Debug == 2 ? 0.0 : Saturation().x, Distance_Irradiance = lerp(0.5,1.0,saturate(D_Irradiance)), DDMasked = lerp(1-saturate((DD-Distance_Irradiance)/(1-Distance_Irradiance)),1,DD * Depth_Mask);
 	C.rgb *= DDMasked;
 	C.rgb *= lerp(1,lerp(1,6,Trim),Depth_Mask);//Used to keep trimming from effecting Sky color too...much....
 	C.rgb = RGBToHSL(lerp(C.rgb, C.rgb * 1.25,Depth_Mask));// Can boost the sky color irradiance here.
-	C.y *= (Sat * Mask) + lerp(1,Saturation.y,Depth_Mask);
+	C.y *= (Sat * Mask) + lerp(1,Saturation().y,Depth_Mask);
 	return HSLToRGB(C.rgb);
 }
 
@@ -1140,7 +1155,7 @@ float Depth_Info(float2 texcoord)
 
 float SUMTexture_lookup(float2 TC, float dx, float dy)
 {   float Depth = 1-Depth_Info( TC );
-		  Depth = (Depth - 0)/ (lerp(1,10,saturate(1-PCGI_2DTexture_Detail)) - 0);
+		  Depth = (Depth - 0)/ (lerp(1,10,saturate(1-PCGI_2DTexture_Detail.x)) - 0);
     float2 uv = (TC.xy + float2(dx , dy ) * pix);
     float3 c = tex2Dlod( BackBufferPCGI, float4(uv.xy,0, 0) ).rgb * 0.5;
 
@@ -1148,37 +1163,37 @@ float SUMTexture_lookup(float2 TC, float dx, float dy)
     return (0.2126*c.r + 0.7152*c.g + 0.0722*c.b) * Depth * 0.00666f;
 }
 
-float3 TextureNormals(float2 UV, float Depth)
+float3 TextureNormals(float2 UV, float Depth )
 {
-	if(saturate(PCGI_2DTexture_Detail) > 0)
+	if(saturate(PCGI_2DTexture_Detail.x) > 0)
 	{
 		// simple sobel edge detection
 	    float dx = 0.0;
-	    dx += -1.0 * SUMTexture_lookup(UV, -2.0, -2.0);
-	    dx += -2.0 * SUMTexture_lookup(UV, -2.0,  0.0);
-	    dx += -1.0 * SUMTexture_lookup(UV, -2.0,  2.0);
-	    dx +=  1.0 * SUMTexture_lookup(UV,  2.0, -2.0);
-	    dx +=  2.0 * SUMTexture_lookup(UV,  2.0,  0.0);
-	    dx +=  1.0 * SUMTexture_lookup(UV,  2.0,  2.0);
+	    dx += -1.0 * SUMTexture_lookup(UV, -1.5, -1.5);
+	    dx += -2.0 * SUMTexture_lookup(UV, -1.5,  0.0);
+	    dx += -1.0 * SUMTexture_lookup(UV, -1.5,  1.5);
+	    dx +=        SUMTexture_lookup(UV,  1.5, -1.5);
+	    dx +=  2.0 * SUMTexture_lookup(UV,  1.5,  0.0);
+	    dx +=        SUMTexture_lookup(UV,  1.5,  1.5);
 
 	    float dy = 0.0;
-	    dy += -1.0 * SUMTexture_lookup(UV, -2.0, -2.0);
-	    dy += -2.0 * SUMTexture_lookup(UV,  0.0, -2.0);
-	    dy += -1.0 * SUMTexture_lookup(UV,  2.0, -2.0);
-	    dy +=  1.0 * SUMTexture_lookup(UV, -2.0,  2.0);
-	    dy +=  2.0 * SUMTexture_lookup(UV,  0.0,  2.0);
-	    dy +=  1.0 * SUMTexture_lookup(UV,  2.0,  2.0);
+	    dy += -1.0 * SUMTexture_lookup(UV, -1.5, -1.5);
+	    dy += -2.0 * SUMTexture_lookup(UV,  0.0, -1.5);
+	    dy += -1.0 * SUMTexture_lookup(UV,  1.5, -1.5);
+	    dy +=        SUMTexture_lookup(UV, -1.5,  1.5);
+	    dy +=  2.0 * SUMTexture_lookup(UV,  0.0,  1.5);
+	    dy +=        SUMTexture_lookup(UV,  1.5,  1.5);
 
 		float edge = sqrt(dx*dx + dy*dy);
 			  edge *= edge;
-
+			  
 		float angle = atan2(dx,dy);
 
 		float X = edge * sin(angle); //X= -X;
 		float Y = edge * sin(angle + 7.5 * PI / 3.);// Adjust me to rotate Normals
 		float Z = edge * (X - Y);
-
-		return min(1,lerp(float3(X,Y,Z), 0, float3(X,Y,Z) == 0.5));
+	
+		return min(1,lerp(float3(X,Y,Z) * lerp(1,Depth,PCGI_2DTexture_Detail.y), 0, float3(X,Y,Z) == 0.5) );
 	}
 	else
 		return 0;
@@ -1229,8 +1244,26 @@ float3 DepthNormals(float2 texcoord)
 	}
 
 	P0 = float3(uv0 - 0.5, 1) * depth;
+	//Not the best way to do it be it had to be fast.
+	float3 Normals_XYZ = cross(P2 - P0, P1 - P0);
+	
+	float3 Norm_XYZ = abs(normalize(Normals_XYZ) * 0.5 + 0.5);
+	
+	float3 DX = ddx(Norm_XYZ);
+	float3 DY = ddy(Norm_XYZ);
+	
+	float DDX, DDY;
+	DDX += depthD;
+	DDX += depthL;
+	DDX += depth;
 
-	return normalize(cross(P2 - P0, P1 - P0) + TextureNormals(texcoord, depth));
+	DDY += depth;
+	DDY += depthR;
+	DDY += depthU;
+	
+	float N_Mask = 1-saturate(distance(DX * DX , DY * DY ) > 0.006), D_Mask = 1-saturate(distance(DDX * DDX , DDY * DDY ) > 0.029);	
+
+	return normalize( Normals_XYZ + lerp(0, TextureNormals(texcoord, depth ), saturate(D_Mask + D_Mask) ) );
 }
 
 float3 UnpackNormals(float2 enc)
@@ -1536,8 +1569,8 @@ void CBReconstruction(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, ou
 
 float3 GI(float2 TC, float Mips)
 {
-	#line 1337 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info ¿½ Tampered"
-	#warning ""
+//	#line 4 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info "
+//	#warning " ÂT ÂA ÂM ÂP ÂE ÂR ÂE ÂD "
 	float3 GI_Out = tex2Dlod( PCGIReconstruction_Info, float4( TC * GI_Res , 0, Mips)).xyz ;
 	return GetPos() ? GI_Out * TC.xyx : GI_Out;
 }   float  Helper() { float Temp_Location = T_01() == 12500 ? 0 : 1 ; return Temp_Location;}
@@ -1580,7 +1613,7 @@ float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Targe
 	float3 clampAmount = abs(Past - CurrAOGI); //V_Buffer;//For AO But,I Droped this and use MixRate;
 	clampAmount.x = saturate(dot(clampAmount, clampAmount));
 
-	float Mixing = saturate(lerp( lerp(0.02,0.2,ReSRes) , lerp(0.2,0.55, GI_Power > (GI_LumaPower+0.5) ? power : Lpower) , clampAmount.x));// Use mixRate or AB Clamping for Mixing.....
+	float Mixing = saturate(lerp( lerp(0.02,0.2,ReSRes) , lerp(0.2,0.5, GI_Power > (GI_LumaPower+0.5) ? power : Lpower) , clampAmount.x));// Use mixRate or AB Clamping for Mixing.....
 	//Simple Blending
 	float3 AA = lerp(Past, CurrAOGI, Mixing );
 	//Sample from Accumulation buffer, with mix rate clamping.
