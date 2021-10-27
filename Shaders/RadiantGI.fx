@@ -292,7 +292,7 @@ uniform float GI_Ray_Length <
 				 "The byproduc of this causes the ray casting distance to extend.\n" //So I opted for keeping the name and explaining it for the user.
 			     "This scales automatically with multi level detail."; // So the name not 100% correct. But, it's close enough.
 	ui_category = "Global Illumination";
-> = 125;
+> = 250;
 
 uniform float Trim <
 	ui_type = "slider";
@@ -336,12 +336,12 @@ uniform float GI_Fade < //Blame the pineapple for this option.
 
 uniform float2 Reflectivness <
 	ui_type = "slider";
-	ui_min = -1.0; ui_max = 1.0;
+	ui_min = 0.0; ui_max = 1.0;
 	ui_label = "Diffusion Amount";
 	ui_tooltip = "This basicly adds control for how defused the lighting should look on the ground.\n"
-			     "Default is [1.0 | 0.0]. One is Max Diffusion and the value is length.";
+			     "Default is [1.0 | 0.5]. One is Max Diffusion and the value is length.";
 	ui_category = "Global Illumination";
-> = float2(1.0,0.0);
+> = float2(1.0,0.5);
 
 uniform bool Emissive_Mode <
 	ui_label = "Emissive Mode";
@@ -386,6 +386,7 @@ uniform float Deep_Scattering <
 			     "Default is [0.1].";
 	ui_category = "Subsurface Scattering";
 > = 0.1;
+
 uniform float Luma_Map <
 	ui_type = "slider";
 	ui_min = 0.0; ui_max = 1.0;
@@ -722,6 +723,11 @@ sampler Sampler { Texture =  TexName; };
 float2 Saturation()
 {
 	return  float2(GI_Saturation,GI_Sky_Saturation);
+}
+
+float Reflect()
+{
+	return Reflectivness.x == 0 ? -0.001 : Reflectivness.x;
 }
 
 float2 GIRL()
@@ -1400,10 +1406,10 @@ float2 MultiPattern(float2 TC)
 }
 
 float2 Rotate2D_A( float2 r, float l , float2 TC)
-{   float Reflective_Diffusion = lerp(saturate(abs(Reflectivness.x)),1.0,smoothstep(0,0.25,1-dot(float3(0,1,0) ,Normals_Depth(TC,0).xyz)));
+{   float Reflective_Diffusion = lerp(saturate(abs(Reflect())),1.0,smoothstep(0,0.25,1-dot(float3(0,1,0) ,Normals_Depth(TC,0).xyz)));
 	float2 Directions;
 	sincos(l,Directions[0],Directions[1]);//same as float2(cos(l),sin(l))
-	Reflective_Diffusion = Reflectivness.x < 0 ? Reflective_Diffusion : MultiPattern(TC.xy * GI_Res).y ? 1 : Reflective_Diffusion;
+	Reflective_Diffusion = Reflect() < 0 ? Reflective_Diffusion : MultiPattern(TC.xy * GI_Res).y ? 1 : Reflective_Diffusion;
 	return float2( dot( r * Reflective_Diffusion, float2(Directions[1], -Directions[0]) ), dot( r, Directions.xy ) );
 }
 
@@ -1422,7 +1428,7 @@ float SSSMasking(float2 TC)
 float RadianceFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB,in float STDepth)
 {   //So normal and the vector between "Element to Element - Radiance Transfer."
 	float4 v = float4(normalize(ddiff), length(ddiff));
-	float Mnormals = abs(Reflectivness.x) < 1 ? lerp(3,0,saturate(dot(float3(0,1,0),normals))) : 3, Trimming = lerp(1,5000,saturate(Trim)) ;
+	float Mnormals = abs(Reflect()) < 1 ? lerp(3,0,saturate(dot(float3(0,1,0),normals))) : 3, Trimming = lerp(1,5000,saturate(Trim)) ;
 	//Emitter & Recever [With emulated Back-Face lighting.]
 	float giE_Selection = Emissive_Mode ? dot( 1-v.xyz   , 1-Normals_Depth(texcoord+AB, Mnormals ).xyz ) : dot( -v.xyz   , Normals_Depth(texcoord+AB, Mnormals ).xyz );
 	float2 giE_R =  max(float2(   step(   0.0,   giE_Selection    ),   dot( v.xyz, normals )   )   ,0);
@@ -1482,8 +1488,8 @@ void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Glo
 	float CB0 = MultiPattern( stexcoords.xy ).x, CB1 = Scattering ? CB0 || SkinDetection(tex2Dlod(PCGIcurrColor,float4(texcoords,0,2))) : 1; //|| SkinDetection(tex2D(BackBufferPCGI,texcoords))
 	//Interlaced Scaling
 	rl_gi_sss.xy *= MultiPattern(stexcoords.xy).y ? 0.75 : 0.375 ; //In hear for keeping the look of 2.9.6
-	float MaskDir = saturate( dot(float3(0,1,0),Normals_Depth(texcoords, 0).xyz) ), Diffusion = lerp(1.0,lerp(1+Reflectivness.y,1.0,abs(Reflectivness.x)), MaskDir );
-	rl_gi_sss.xy *= Reflectivness.x < 0 ? Diffusion : MultiPattern(stexcoords.xy).y ? 1 : Diffusion;
+	float MaskDir = saturate( dot(float3(0,1,0),Normals_Depth(texcoords, 0).xyz) ), Diffusion = lerp(1.0,lerp(Reflectivness.y * 2,1.0,abs(Reflect())), MaskDir );
+	rl_gi_sss.xy *= Reflect() < 0 ? Diffusion : MultiPattern(stexcoords.xy).y ? 1 : Diffusion;
 	//Basic depth rescaling from Near to Far
 	float D0 = smoothstep(-NCD.x,1, depth ), D1 = smoothstep(-1,1, depth ), N_F = lerp(GI_Fade * 2,0, 1-D ), MDCutOff = smoothstep(0,1,D) > MaxDepth_CutOff;//smoothstep(0,saturate(GI_Fade),D);
 	float4 IGN = IGN_Toggle ? Interleaved_Gradient_Noise(stexcoords / pix / 2) * 2 - 1 : random;
@@ -1569,8 +1575,8 @@ void CBReconstruction(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, ou
 
 float3 GI(float2 TC, float Mips)
 {
-//	#line 4 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info "
-//	#warning " ÂT ÂA ÂM ÂP ÂE ÂR ÂE ÂD "
+	#line 4 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info "
+	#warning " ÂT ÂA ÂM ÂP ÂE ÂR ÂE ÂD "
 	float3 GI_Out = tex2Dlod( PCGIReconstruction_Info, float4( TC * GI_Res , 0, Mips)).xyz ;
 	return GetPos() ? GI_Out * TC.xyx : GI_Out;
 }   float  Helper() { float Temp_Location = T_01() == 12500 ? 0 : 1 ; return Temp_Location;}
@@ -1638,7 +1644,7 @@ float4 BGU_Ver(float4 position : SV_Position, float2 texcoords : TEXCOORD) : SV_
 
 float3 Composite(float3 Color, float3 Cloud)
 {
-	float3 Output, FiftyGray = Cloud + 0.5;
+	float3 Output, FiftyGray = Cloud + 0.490;
 	//Left for Rework
 	//FiftyGray = Shadows(FiftyGray);
 	#if Controlled_Blend
@@ -1713,7 +1719,7 @@ float4 MixOut(float2 texcoords)
 	if(Debug == 0)
 		Done.rgb = Depth_Guide ? Layer.rgb * float3((Depth/FakeAO> 0.998),1,(Depth/FakeAO > 0.998))  : Layer.rgb;
 	else if(Debug == 1)
-		Done.rgb = lerp(Output + 0.5 * lerp(1-(Depth-FakeAO * 0.75) ,1,smoothstep(0,1,Depth) == 1),Output,Dark_Mode); //This fake AO is a lie..........
+		Done.rgb = lerp(Output + 0.625 * lerp(1-(Depth-FakeAO * 0.625) ,1,smoothstep(0,1,Depth) == 1),Output,Dark_Mode); //This fake AO is a lie..........
 	else if(Debug == 2)
 		Done.rgb = DirectLighting( texcoords, 0).rgb;
 	else
@@ -2282,5 +2288,13 @@ ui_tooltip = "Beta: Global Illumination Secondary Output.Â²"; >
 // Added Interleaved Gradient Noise as default on option. Gives the GI a smoother look when denoising. Because of this I lowered default Defnoise power to 6...
 // Also added an Experimental Texture Details option.
 // Now even your crevices can have GI................
+//
+// Update 3.0.4
+//
+// Simplified RadiantGI setting and recategorized many of them to make the shader easier to use. This update also makes Enhanced Texture Details a standard for this shader.
+// Supplemental contributions has the extra setting needed for enhanced features. 
+// Moved Resolution scaling to the Extra Options area.
+//
+// So far so go. This shader starting to enter a of period optimzation.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
