@@ -3,7 +3,7 @@
 //-----------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 4.0+ SSDO Ver 0.2.5
+//For Reshade 4.0+ SSDO Ver 0.2.7
 //-----------------------------
 //                                                                Screen Space Directional Occlusion
 //
@@ -183,13 +183,14 @@ uniform float SSDO_Trimming <
     ui_tooltip = "Use this to limit the local falloff of the ao in the image also known as Depth Range Check.";
 	ui_category = "SSDO";
 > = 0.1;
+
 uniform float SSDO_Fade <
 	ui_type = "slider";
-    ui_min = -2.0; ui_max = 2.0;
+    ui_min = -1.0; ui_max = 1.0;
 	ui_label = "Depth Fade-Out";
 	ui_tooltip = "SSDO Application Power that is based on Depth scaling for controlled fade In-N-Out.\n" //That's What A Hamburger's All About
-			     "Can be set from 0 to 1 and is Set to Zero for No Culling.\n"
-			     "Default is 0.0.";
+			     "Can be set from -1 to 1 and is Set to Zero for No Culling.\n"
+			     "Default is 0.5.";
 	ui_category = "SSDO";
 > = 1.0;
 /*
@@ -201,7 +202,7 @@ uniform int BM <
     ui_category = "Image";
     > = 0;
 */
-static const int BM = 3; //Phased out Since I wanted this shader to be more simple.
+static const int Blend_Mode = 3; //Phased out Since I wanted this shader to be more simple.
 
 uniform int SSDO_X2 < //Thank you Nathaniel for the name
 	ui_type = "combo";
@@ -209,9 +210,9 @@ uniform int SSDO_X2 < //Thank you Nathaniel for the name
 	ui_label = "Square Input";
 	ui_tooltip = "This option squares the input of BackBuffer for SSDO.\n"
 				 "You can also favor Illuminated areas or Darker areas.\n"
-				 "This is basically effects the GI Color and AO, Default is Square Luma Negitive.";
+				 "This is basically effects the GI Color and AO, Default is Off.";
 	ui_category = "Image";// Starting to define my look.
-> = 3;
+> = 0;
 
 uniform float SSDO_Power<
 	ui_type = "slider";
@@ -465,6 +466,16 @@ uniform float clock < source = "timer"; >;             // A timer that starts wh
 
 static const float2 XYoffset[8] = { float2( 0,+pix.y ), float2( 0,-pix.y), float2(+pix.x, 0), float2(-pix.x, 0), float2(-pix.x,-pix.y), float2(+pix.x,-pix.y), float2(-pix.x,+pix.y), float2(+pix.x,+pix.y) };
 
+float Scale_SSDO_Fade()
+{
+	return lerp(0,2,saturate(abs(SSDO_Fade)) );
+}
+
+float Offset_Switch()
+{
+	return Offset >= -0.0015 && Offset <= 0.0015 ? 0 : Offset;  
+}
+
 static const float2 POISSON_SAMPLES[64] =
 {
 float2( 0.5273496125406625f, 0.32843211798055333f ),
@@ -682,12 +693,12 @@ float Depth_Info(float2 texcoord)
 		texcoord.y =  1 - texcoord.y;
 
 	//Conversions to linear space.....
-	float zBuffer = tex2Dlod(ZBufferSSDO, float4(texcoord,0,0)).x, zBufferWH = zBuffer, Far = 1.0, Near = 0.125/Depth_Map_Adjust, NearWH = 0.125/(Depth_Map ? NCD.y : 10*NCD.y), OtherSettings = Depth_Map ? NCD.y : 100 * NCD.y ; //Near & Far Adjustment
+	float zBuffer = tex2Dlod(ZBufferSSDO, float4(texcoord,0,0)).x, zBufferWH = zBuffer, Far = 1.0, Near = 0.125/(0.00000001+Depth_Map_Adjust), NearWH = 0.125/(Depth_Map ? NCD.y : 10*NCD.y), OtherSettings = Depth_Map ? NCD.y : 100 * NCD.y ; //Near & Far Adjustment
 	//Man Why can't depth buffers Just Be Normal
-	float2 C = float2( Far / Near, 1.0 - Far / Near ), Z = Offset < 0 ? min( 1.0, zBuffer * ( 1.0 + abs(Offset) ) ) : float2( zBuffer, 1.0 - zBuffer ), Offsets = float2(1 + OtherSettings,1 - OtherSettings), zB = float2( zBufferWH, 1-zBufferWH );
+	float2 C = float2( Far / Near, 1.0 - Far / Near ), Z = Offset_Switch() < 0 ? min( 1.0, zBuffer * ( 1.0 + abs(Offset_Switch()) ) ) : float2( zBuffer, 1.0 - zBuffer ), Offsets = float2(1 + OtherSettings,1 - OtherSettings), zB = float2( zBufferWH, 1-zBufferWH );
 
-	if(Offset > 0 || Offset < 0)
-	Z = Offset < 0 ? float2( Z.x, 1.0 - Z.y ) : min( 1.0, float2( Z.x * (1.0 + Offset) , Z.y / (1.0 - Offset) ) );
+	if(Offset_Switch() > 0 || Offset_Switch() < 0)
+	Z = Offset_Switch() < 0 ? float2( Z.x, 1.0 - Z.y ) : min( 1.0, float2( Z.x * (1.0 + Offset_Switch()) , Z.y / (1.0 - Offset_Switch()) ) );
 
 	if (NCD.y > 0)
 	zB = min( 1, float2( zB.x * Offsets.x , zB.y / Offsets.y  ));
@@ -878,11 +889,10 @@ float4 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 		  SSDO_Contribution_Range = SSDO_SRM*pix.x*max(SSDO_Trimming,0.001);//simple scale for aka "Zthiccness."
 	const float ATTF = 1e-5; // attenuation factor
 	float random = MCNoise( texcoords , 1, 1 ) * 2 - 1, IGN = Interleaved_Gradient_Noise(floor( texcoords.xy / pix / Scale));
-	float ILuma = Luma(tex2Dlod(SamplerColorsSSDO,float4(texcoords,0,4.5)).xyz) * 2.0;
 	float4 SSDO, Normals_Depth = NDSampler(texcoords, 0);
-	float D0 = smoothstep(-NCD.x,1.0,Normals_Depth.w),D_Fade = SSDO_Fade > 0 ? lerp(1-SSDO_Fade * 2,0, 1-Normals_Depth.w ) : smoothstep(0,abs(SSDO_Fade),Normals_Depth.w);
+	float D0 = smoothstep(-NCD.x,1.0,Normals_Depth.w),D_Fade = SSDO_Fade < 0 ? lerp(1-Scale_SSDO_Fade() * 2,0, 1-Normals_Depth.w ) : smoothstep(0,2,Normals_Depth.w / Scale_SSDO_Fade());
 	int Mip_Switch = SSDO_MipSampling == 4 || SSDO_MipSampling == 5 ? 1 : 0;
-	//[fastop]
+	[loop]
 	for (int i = 1.0; i <= SSDO_Samples; i++)
 	{   //Ref said to use continue.... But, better perf with discard.
 		if(texcoords.x >= 1 || texcoords.y >= 1)
@@ -899,16 +909,8 @@ float4 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 		float4 vsFetch = NDSampler(RayCoords,Adaptive_Mipping) ;
 
 		float3 LocalGI = tex2Dlod(SamplerColorsSSDO,float4(RayCoords,0,3)).xyz ;
-		if(SSDO_X2 == 1)
-			   LocalGI *= LocalGI;
-		if(SSDO_X2 == 2)
-			   LocalGI *= lerp(1,LocalGI,ILuma);
-		if(SSDO_X2 == 3)
-			   LocalGI *= lerp(1,LocalGI,1-ILuma);
-
-			   //LocalGI = Saturator(LocalGI);
 			   LocalGI *= SSDO_ColorPower;
-
+			   
 		// Compute the bounce geometric shape towards the direction of the blocker. Aka Position
 		float3 Pos = GetPosition(  texcoords, RayCoords, Normals_Depth.w - ATTF, vsFetch.w + ATTF);
 		float3 normalizedPos = normalize(Pos);
@@ -1044,11 +1046,11 @@ float3 Composite(float3 Color, float3 Cloud)
 {
 	float3 Output, FiftyGray = Cloud - 0.5;
 
-	if(BM == 0)
+	if(Blend_Mode == 0)
 		Output = lerp((overlay( Color,  FiftyGray) + softlight( Color,  FiftyGray)) * 0.5 , mult(  Color, Cloud ), 0.5);
-	else if(BM == 1)
+	else if(Blend_Mode == 1)
 		Output = overlay( Color, FiftyGray);
-	else if(BM == 2)
+	else if(Blend_Mode == 2)
 		Output = softlight( Color, FiftyGray);
 	else
 		Output = mult( Color ,  Cloud );
@@ -1066,11 +1068,21 @@ float4 SSDOMixing(float2 texcoords )
 	//Mip Denoiser
 	float3 ssdo = SSDO_MipBLur( SSDOaccuFrames, texcoords,0.0);//lerp(SSDO_MipBLur( SSDOaccuFrames, texcoords,2),SSDO_MipBLur( SSDOaccuFrames, texcoords,0),NormalMask(texcoords,1));
 	float Intencity_Mask = tex2Dlod(SamplerColorsSSDO,float4(texcoords,0,2.5)).w;
+	float ILuma = Luma(tex2Dlod(SamplerColorsSSDO,float4(texcoords,0,4.5)).xyz) * 2.0;
+		
 	if(smoothstep(0,1,Depth) > SSDO_Max_Depth)
 		ssdo = 1;
 	float3 Noise = float3(MCNoise( texcoords , 1, 1 ), MCNoise( texcoords , 1, 2 ), MCNoise( texcoords , 1, 3 ));
 	float3 SS  = smoothstep( 0.0, 0.1, Saturator(ssdo).rgb );
 		   SS *= 0.0225;
+	
+	if(SSDO_X2 == 1)
+	   ssdo *= ssdo;
+	if(SSDO_X2 == 2)
+	   ssdo *= lerp(1,ssdo,ILuma);
+	if(SSDO_X2 == 3)
+	   ssdo *= lerp(1,ssdo,1-ILuma);	   
+		   
 	if(Dither_SSDO)
 		ssdo = saturate(Saturator(ssdo)+ Noise * SS);
 	else

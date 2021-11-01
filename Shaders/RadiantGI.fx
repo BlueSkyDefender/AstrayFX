@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 3.0.4
+//For Reshade 3.0+ PCGI Ver 3.0.6
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -514,24 +514,15 @@ uniform float GI_Power <
 			     "Default is [Power 1.0].";
 	ui_category = "Image";
 > = 1.0;
-//Lord of Lunacy says white power would be bad.
-uniform float GI_LumaPower <
 
-	ui_type = "slider";
-	ui_min = 0.0; ui_max = 1.0;
-	ui_label = "Luma Power";
-	ui_tooltip = "Control the white strength in the image.\n"
-			     "Default is [0.5].";
-	ui_category = "Image";
-> = 0.5;
 uniform float GI_Saturation <
 	ui_type = "slider";
 	ui_min = 0.0; ui_max = 5.0;
 	ui_label = "GI Saturation";
 	ui_tooltip = "Irradiance Map Saturation.\n"
-			     "Default is [Power 0.5].";
+			     "Default is [Power 1.0].";
 	ui_category = "Image";
-> = 0.5;
+> = 1.0;
 /*
 uniform float shadows <
     ui_type = "slider";
@@ -546,9 +537,9 @@ uniform float HDR_BP <
 	ui_min = 0.0; ui_max = 1.0;
 	ui_label = "HDR Extraction Power";
 	ui_tooltip = "Use This to adjust the HDR Power, You can override this value and set it to like 1.5 or something.\n"
-				 "Dedault is Zero and is Off.";//Because new HDR extraction works well now.
+				 "Dedault is [0.5] and Zero and is Off.";//Because new HDR extraction works well now.
 	ui_category = "Image";
-> = 0.0;
+> = 0.5;
 
 uniform int Depth_Map <
 	ui_type = "combo";
@@ -579,6 +570,7 @@ uniform float Offset <
 				 "Default and starts at Zero and it is Off.";
 	ui_category = "Depth Map";
 > = DA_Z;
+
 uniform bool Depth_Map_Flip <
 	ui_label = "Depth Map Flip";
 	ui_tooltip = "Flip the depth map if it is upside down.";
@@ -719,6 +711,11 @@ uniform float clock < source = "timer"; >;             // A timer that starts wh
 texture TexName < source =  LUT_File_Name; > { Width =  Tile_SizeXY *  Tile_Amount; Height =  Tile_SizeXY ; };
 sampler Sampler { Texture =  TexName; };
 #endif
+
+float Offset_Switch()
+{
+	return Offset >= -0.0015 && Offset <= 0.0015 ? 0 : Offset;  
+}
 
 float2 Saturation()
 {
@@ -916,7 +913,7 @@ float3 Saturator_B(float3 C) // for SSS
 float3 Saturator_C(float3 C) // for SSS
 {
 	C.rgb = RGBToHSL(C.rgb);
-	C.y *= 1.+ saturate(GI_LumaPower-0.625) ;
+	//C.y *= 1.+ saturate(GI_LumaPower-0.625) ;
 	return HSLToRGB(C.rgb);
 }
 
@@ -1135,12 +1132,12 @@ float Depth_Info(float2 texcoord)
 		texcoord.y =  1 - texcoord.y;
 
 	//Conversions to linear space.....
-	float zBuffer = tex2Dlod(ZBuffer, float4(texcoord,0,0)).x, zBufferWH = zBuffer, Far = 1.0, Near = 0.125/Depth_Map_Adjust, NearWH = 0.125/(Depth_Map ? NCD.y : 10*NCD.y), OtherSettings = Depth_Map ? NCD.y : 100 * NCD.y ; //Near & Far Adjustment
+	float zBuffer = tex2Dlod(ZBuffer, float4(texcoord,0,0)).x, zBufferWH = zBuffer, Far = 1.0, Near = 0.125/(0.00000001+Depth_Map_Adjust), NearWH = 0.125/(0.00000001+(Depth_Map ? NCD.y : 10*NCD.y)), OtherSettings = Depth_Map ? NCD.y : 100 * NCD.y ; //Near & Far Adjustment
 	//Man Why can't depth buffers Just Be Normal
-	float2 C = float2( Far / Near, 1.0 - Far / Near ), Z = Offset < 0 ? min( 1.0, zBuffer * ( 1.0 + abs(Offset) ) ) : float2( zBuffer, 1.0 - zBuffer ), Offsets = float2(1 + OtherSettings,1 - OtherSettings), zB = float2( zBufferWH, 1-zBufferWH );
+	float2 C = float2( Far / Near, 1.0 - Far / Near ), Z = Offset_Switch() < 0 ? min( 1.0, zBuffer * ( 1.0 + abs(Offset_Switch()) ) ) : float2( zBuffer, 1.0 - zBuffer ), Offsets = float2(1 + OtherSettings,1 - OtherSettings), zB = float2( zBufferWH, 1-zBufferWH );
 
-	if(Offset > 0 || Offset < 0)
-	Z = Offset < 0 ? float2( Z.x, 1.0 - Z.y ) : min( 1.0, float2( Z.x * (1.0 + Offset) , Z.y / (1.0 - Offset) ) );
+	if(Offset_Switch() > 0 || Offset_Switch() < 0)
+	Z = Offset_Switch() < 0 ? float2( Z.x, 1.0 - Z.y ) : min( 1.0, float2( Z.x * (1.0 + Offset_Switch()) , Z.y / (1.0 - Offset_Switch()) ) );
 
 	if (NCD.y > 0)
 	zB = min( 1, float2( zB.x * Offsets.x , zB.y / Offsets.y  ));
@@ -1306,19 +1303,19 @@ float2 Vogel2D(int uIndex, int nTaps, float phi)
     return r * sc.yx;
 }
 
-float3 Ublur(sampler2D Tex,in float2 TC,int Mip, float Radius)
+float4 Ublur(sampler2D Tex,in float2 TC,int Mip, float Radius)
 {
     const int uTaps = 8;//went from 16 to 8 saves a little
     //float uBoard = fmod(dot(pos, 1.0), 2.0);
     float2 ps = pix * Radius;
     float urand = MCNoise( 1, TC, 1 ) * (PI*2);//nrand(pos * uBoard) * (PI*2);
-    float3 uImage;
+    float4 uImage;
 
     [fastopt]
     for (int i = 0; i < uTaps; i++)
     {
         float2 ofs = Vogel2D(i, uTaps, urand);
-        float3 uColor = tex2Dlod(Tex,float4(TC + ofs * ps,0,Mip)).rgb;
+        float4 uColor = tex2Dlod(Tex,float4(TC + ofs * ps,0,Mip)).rgba;
         uImage = lerp(uImage, uColor, rcp(i + 1));
     }
 
@@ -1487,7 +1484,7 @@ void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Glo
 	//CheckerBoard Pattern Grab to save Perf
 	float CB0 = MultiPattern( stexcoords.xy ).x, CB1 = Scattering ? CB0 || SkinDetection(tex2Dlod(PCGIcurrColor,float4(texcoords,0,2))) : 1; //|| SkinDetection(tex2D(BackBufferPCGI,texcoords))
 	//Interlaced Scaling
-	rl_gi_sss.xy *= MultiPattern(stexcoords.xy).y ? 0.75 : 0.375 ; //In hear for keeping the look of 2.9.6
+	rl_gi_sss.xy *= MultiPattern(stexcoords.xy).y ? Alternate ? 1.0 : 0.5 : Alternate ? 0.05 : 0.10 ;
 	float MaskDir = saturate( dot(float3(0,1,0),Normals_Depth(texcoords, 0).xyz) ), Diffusion = lerp(1.0,lerp(Reflectivness.y * 2,1.0,abs(Reflect())), MaskDir );
 	rl_gi_sss.xy *= Reflect() < 0 ? Diffusion : MultiPattern(stexcoords.xy).y ? 1 : Diffusion;
 	//Basic depth rescaling from Near to Far
@@ -1538,7 +1535,7 @@ void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Glo
 	float Samp = rcp(Samples);
 	GI *= Samp; SS *= Samp;
 
-	GlobalIllumination = float4( min( 1.0 , GI.rgb * 2.0 ) , GI.w);
+	GlobalIllumination = float4( min( 1.0 , GI.rgb ) , GI.w);
 	SubsurfaceScattering = min( 1.0 , float4(SS.rgb, SS.w * 2.0));
 }
 
@@ -1547,7 +1544,7 @@ float4 GI_Adjusted(float2 TC, int Mip)
 	float4 ConvertGI = tex2Dlod( PCGI_Info, float4( TC , 0, Mip)) , ConvertSS = tex2Dlod( PCSS_Info, float4( TC , 0, Mip));
 
 	ConvertGI.xyz = RGBtoYCbCr(ConvertGI.xyz);
-	ConvertGI.x *= GI_LumaPower.x;
+	ConvertGI.x *= 1.0;//GI_LumaPower.x;
 	ConvertGI.xyz = Saturator_C(YCbCrtoRGB( ConvertGI.xyz));
 
 	float DTMip = lerp(3,5,dot(BBColor(TC / GI_Res, 6.0).rgb,0.333)),DT = BBColor(TC / GI_Res, DTMip  ).w * 2.0, SSL = 1;//clamp(dot(BBColor(TC / GI_Res, 2.0).rgb,0.333) * lerp(1.0,4.0,User_SSS_Luma),1,2);
@@ -1575,7 +1572,7 @@ void CBReconstruction(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, ou
 
 float3 GI(float2 TC, float Mips)
 {
-	#line 4 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info "
+	#line 4 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info ¿"
 	#warning " ÂT ÂA ÂM ÂP ÂE ÂR ÂE ÂD "
 	float3 GI_Out = tex2Dlod( PCGIReconstruction_Info, float4( TC * GI_Res , 0, Mips)).xyz ;
 	return GetPos() ? GI_Out * TC.xyx : GI_Out;
@@ -1587,8 +1584,8 @@ float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Targe
 	//Velocity Scaler
 	//float S_Velocity = 12.5 * lerp( 1, 80,TAA_Clamping), V_Buffer = saturate(abs(DepthMap(texcoords, 0)-tex2D(PCGIpastFrame,texcoords).w )* S_Velocity);
 	//Accumulation buffer Start
-	//Resolution Scale //GI_Power GI_LumaPower
-	float ReSRes = Scale(GI_Res,1.0,0.5), power = GI_Power >= 1 ? Scale(GI_Power,1.0,2.5) : 1, Lpower = GI_LumaPower >= 0.5 ? Scale(GI_LumaPower,0.5,1.0) : 1, Res_Scale = lerp(1.0,0.0,ReSRes);
+	//Resolution Scale & GI_Power
+	float ReSRes = Scale(GI_Res,1.0,0.5), power = GI_Power >= 1 ? Scale(GI_Power,1.0,2.5) : 1, Res_Scale = lerp(1.0,0.0,ReSRes);
 	float3 GISamples, CurrAOGI = GI( texcoords, Debug == 1 ? 0 : Res_Scale).rgb, MB = 0;
 	float3 minColor = CurrAOGI - MB;
 	float3 maxColor = CurrAOGI + MB;
@@ -1619,7 +1616,7 @@ float4 GI_TAA(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Targe
 	float3 clampAmount = abs(Past - CurrAOGI); //V_Buffer;//For AO But,I Droped this and use MixRate;
 	clampAmount.x = saturate(dot(clampAmount, clampAmount));
 
-	float Mixing = saturate(lerp( lerp(0.02,0.2,ReSRes) , lerp(0.2,0.5, GI_Power > (GI_LumaPower+0.5) ? power : Lpower) , clampAmount.x));// Use mixRate or AB Clamping for Mixing.....
+	float Mixing = saturate(lerp( lerp(0.02,0.2,ReSRes) , lerp(0.2,0.5, power ) , clampAmount.x));// Use mixRate or AB Clamping for Mixing.....
 	//Simple Blending
 	float3 AA = lerp(Past, CurrAOGI, Mixing );
 	//Sample from Accumulation buffer, with mix rate clamping.
@@ -1642,24 +1639,30 @@ float4 BGU_Ver(float4 position : SV_Position, float2 texcoords : TEXCOORD) : SV_
 	return float4( Denoise( PCGI_BGUHorizontal_Sample, texcoords, EvenSteven[clamp(SamplesXY,0,20)], 1, 2.5).rgb, 0);
 }
 
+float3 ControlledBlend(float3 Color, float3 Cloud)
+{
+	float3 FiftyGray = Cloud + 0.490;
+	#if Controlled_Blend
+		return add( lerp( overlay( Color,  FiftyGray), softlight( Color,  FiftyGray),Blend),Cloud * 0.1875);
+	#else
+		return add( lerp( overlay( Color,  FiftyGray), softlight( Color,  FiftyGray), 0.5 ),Cloud * 0.1875);
+	#endif
+}
+
 float3 Composite(float3 Color, float3 Cloud)
 {
-	float3 Output, FiftyGray = Cloud + 0.490;
+	float3 FiftyGray = Cloud + 0.490;
 	//Left for Rework
 	//FiftyGray = Shadows(FiftyGray);
-	#if Controlled_Blend
-		Output = add( lerp( overlay( Color,  FiftyGray), softlight( Color,  FiftyGray),Blend),Cloud * 0.1875);
-	#else
+
 	if(Blend == 0)
-		Output = add( lerp( overlay( Color,  FiftyGray), softlight( Color,  FiftyGray), 0.5 ),Cloud * 0.1875);
+		return ControlledBlend( Color,  Cloud);
 	else if(Blend == 1)
-		Output = overlay( Color, FiftyGray);
+		return overlay( Color, FiftyGray);
 	else if(Blend == 2)
-		Output = softlight( Color, FiftyGray);
+		return softlight( Color, FiftyGray);
 	else
-		Output = add( Color, Cloud );
-	#endif
-	return Output;
+		return add( Color, Cloud );
 }
 
 float3 Mix(float2 texcoords)
@@ -1707,19 +1710,42 @@ float3 DiffusionBlur(float2 texcoords)
 		return Mix(texcoords).rgb;
 }
 
+#define DScale -1
+float D_Scale(float Input)
+{
+	return (Input-DScale)/(1-DScale);
+}
+
 float4 MixOut(float2 texcoords)
 {
 	//float2 Grid = floor( texcoords * float2(BUFFER_WIDTH, BUFFER_HEIGHT ) * pix * 125);//125 lines
-	float  Depth = Normals_Depth(texcoords,0).w, FakeAO = Debug == 1 || Depth_Guide ? ( Depth +
-				   Normals_Depth(texcoords + float2(pix.x * 2,0),1).w +
-				   Normals_Depth(texcoords + float2(-pix.x * 2,0),2).w +
-				   Normals_Depth(texcoords + float2(0,pix.y * 2),Depth_Guide ? 3 : 8).w  +
-				   Normals_Depth(texcoords + float2(0,-pix.y * 2),Depth_Guide ? 4 : 10) ).w * 0.2 : 0;
+				   
+	float  Depth = D_Scale(Normals_Depth(texcoords,0).w), AO_Scale = 0.5,FakeAO = Debug == 1 ? (
+				   Normals_Depth(texcoords ,1).w +			   
+				   Normals_Depth(texcoords ,2).w +
+				   Normals_Depth(texcoords ,3).w +
+				   Normals_Depth(texcoords ,4).w +
+				   Normals_Depth(texcoords ,5).w +
+				   Normals_Depth(texcoords ,6).w +
+				   Normals_Depth(texcoords ,7).w +
+				   Normals_Depth(texcoords ,8).w +
+				   Normals_Depth(texcoords ,9).w +
+				   Normals_Depth(texcoords ,10).w
+					) * 0.1: 0.00000001;		   
+					FakeAO = (1-Depth/D_Scale(FakeAO) * AO_Scale ) * (1+AO_Scale);
+					
+	float  Guide = Depth_Guide ? ( Depth +
+				   				Normals_Depth(texcoords + float2( pix.x * 2.5, 0), 1 ).w +
+				   				Normals_Depth(texcoords + float2(-pix.x * 2.5, 0), 2 ).w +
+				   				Normals_Depth(texcoords + float2( 0, pix.y * 2.5), 3 ).w +
+				   				Normals_Depth(texcoords + float2( 0,-pix.y * 2.5), 4 ).w ) * 0.2 : 0.00000001;
+				   
 	float3 Output = tex2D( PCGI_BGUVertical_Sample, texcoords).rgb, Layer = DiffusionBlur( texcoords ); float4 Done = float4(Layer,0.5);
+
 	if(Debug == 0)
-		Done.rgb = Depth_Guide ? Layer.rgb * float3((Depth/FakeAO> 0.998),1,(Depth/FakeAO > 0.998))  : Layer.rgb;
-	else if(Debug == 1)
-		Done.rgb = lerp(Output + 0.625 * lerp(1-(Depth-FakeAO * 0.625) ,1,smoothstep(0,1,Depth) == 1),Output,Dark_Mode); //This fake AO is a lie..........
+		Done.rgb = Depth_Guide ? Layer.rgb * float3((Depth/Guide> 0.998),1,(Depth/Guide > 0.998))  : Layer.rgb;
+	else if(Debug == 1)//(1-Depth/FakeAO * 0.75)  ;
+		Done.rgb = lerp(lerp(smoothstep(0.5,1,(Output * 0.5625) + FakeAO),1,smoothstep(0,1,Depth) == 1),Output,Dark_Mode); //This fake AO is a lie..........
 	else if(Debug == 2)
 		Done.rgb = DirectLighting( texcoords, 0).rgb;
 	else
@@ -2295,6 +2321,13 @@ ui_tooltip = "Beta: Global Illumination Secondary Output.Â²"; >
 // Supplemental contributions has the extra setting needed for enhanced features. 
 // Moved Resolution scaling to the Extra Options area.
 //
-// So far so go. This shader starting to enter a of period optimzation.
+// Update 3.0.5
+//
+// Simplified RadiantGI setting even more and tried to make the lighting more accurate. I removed luma power and left normal power there since was almost the same thing.
+//
+// Update 3.0.6
+//
+// Made the sampling radius change every other frame to grab a larger sample base. So that the TAA can blend them and provide a more accurate / better GI output.
+// It been fun learning on this shader. I do hope you enjoy this update.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
