@@ -324,15 +324,15 @@ uniform float2 NCD <
 	ui_category = "Global Illumination";
 > = float2(0.125,0.0);
 
-uniform float GI_Fade < //Blame the pineapple for this option.
+uniform float PCGI_Fade < //Blame the pineapple for this option.
 	ui_type = "slider";
-	ui_min = 0.0; ui_max = 1.0; //Still need to make this better......
+	ui_min = -1.0; ui_max = 1.0; //Still need to make this better......
 	ui_label = "Depth Fade-Out";
 	ui_tooltip = "GI Application Power that is based on Depth scaling for controlled fade In-N-Out.\n" //That's What A Hamburger's All About
 			     "Can be set from 0 to 1 and is Set to Zero for No Culling.\n"
 			     "Default is 0.0.";
 	ui_category = "Global Illumination";
-> = 0.0;
+> = 1.0;
 
 uniform float2 Reflectivness <
 	ui_type = "slider";
@@ -711,6 +711,11 @@ uniform float clock < source = "timer"; >;             // A timer that starts wh
 texture TexName < source =  LUT_File_Name; > { Width =  Tile_SizeXY *  Tile_Amount; Height =  Tile_SizeXY ; };
 sampler Sampler { Texture =  TexName; };
 #endif
+
+float Scale_PCGI_Fade()
+{
+	return lerp(0,2,saturate(abs(PCGI_Fade)) );
+}
 
 float Offset_Switch()
 {
@@ -1488,7 +1493,7 @@ void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Glo
 	float MaskDir = saturate( dot(float3(0,1,0),Normals_Depth(texcoords, 0).xyz) ), Diffusion = lerp(1.0,lerp(Reflectivness.y * 2,1.0,abs(Reflect())), MaskDir );
 	rl_gi_sss.xy *= Reflect() < 0 ? Diffusion : MultiPattern(stexcoords.xy).y ? 1 : Diffusion;
 	//Basic depth rescaling from Near to Far
-	float D0 = smoothstep(-NCD.x,1, depth ), D1 = smoothstep(-1,1, depth ), N_F = lerp(GI_Fade * 2,0, 1-D ), MDCutOff = smoothstep(0,1,D) > MaxDepth_CutOff;//smoothstep(0,saturate(GI_Fade),D);
+	float D0 = smoothstep(-NCD.x,1, depth ), D1 = smoothstep(-1,1, depth ), D_Fade = PCGI_Fade < 0 ? lerp(1-Scale_PCGI_Fade() * 2,0, 1-D ) : smoothstep(0,2,D / Scale_PCGI_Fade()), MDCutOff = smoothstep(0,1,D) > MaxDepth_CutOff;//smoothstep(0,saturate(GI_Fade),D);
 	float4 IGN = IGN_Toggle ? Interleaved_Gradient_Noise(stexcoords / pix / 2) * 2 - 1 : random;
 	//SSS, GI, Gloss, and AO Form Factor code look above
 	[fastopt] // Dose this even do anything better vs unroll? Compile times seem the same too me. Maybe this will work better if I use the souls I collect of the users that use this shader?
@@ -1519,7 +1524,7 @@ void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Glo
 			//Irradiance Information
 			II_gi = DirectLighting( texcoords + GIWH, 3 ).rgb * 1.125;
 			//Radiance Form Factor
-			GI.rgb += lerp(II_gi, 0, N_F) * RadianceFF(texcoords, ddiff_gi, n, GIWH, smoothstep(1,0,D));
+			GI.rgb += lerp(II_gi, 0, D_Fade) * RadianceFF(texcoords, ddiff_gi, n, GIWH, smoothstep(1,0,D));
 		}
 
 		if(!CB1)
@@ -1529,7 +1534,7 @@ void PCGI(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, out float4 Glo
 			II_ss = BBColor( texcoords + SSWH, 3).rgb;
 			//SubsurfaceScattering Form Factor
 			//lerp( 0,lerp(II_ss, 0, N_F), SSSMasking( texcoords))
-			SS.rgb += lerp( 0,lerp(II_ss, 0, N_F), SSSMasking( texcoords)) * SubsurfaceScatteringFF( texcoords, ddiff_ss, n, SSWH);
+			SS.rgb += lerp( 0,lerp(II_ss, 0, D_Fade), SSSMasking( texcoords)) * SubsurfaceScatteringFF( texcoords, ddiff_ss, n, SSWH);
 		}
 	}
 	float Samp = rcp(Samples);
@@ -1544,7 +1549,7 @@ float4 GI_Adjusted(float2 TC, int Mip)
 	float4 ConvertGI = tex2Dlod( PCGI_Info, float4( TC , 0, Mip)) , ConvertSS = tex2Dlod( PCSS_Info, float4( TC , 0, Mip));
 
 	ConvertGI.xyz = RGBtoYCbCr(ConvertGI.xyz);
-	ConvertGI.x *= 1.0;//GI_LumaPower.x;
+	ConvertGI.x *= 0.75;//GI_LumaPower.x;
 	ConvertGI.xyz = Saturator_C(YCbCrtoRGB( ConvertGI.xyz));
 
 	float DTMip = lerp(3,5,dot(BBColor(TC / GI_Res, 6.0).rgb,0.333)),DT = BBColor(TC / GI_Res, DTMip  ).w * 2.0, SSL = 1;//clamp(dot(BBColor(TC / GI_Res, 2.0).rgb,0.333) * lerp(1.0,4.0,User_SSS_Luma),1,2);
@@ -1718,8 +1723,7 @@ float D_Scale(float Input)
 
 float4 MixOut(float2 texcoords)
 {
-	//float2 Grid = floor( texcoords * float2(BUFFER_WIDTH, BUFFER_HEIGHT ) * pix * 125);//125 lines
-				   
+	//float2 Grid = floor( texcoords * float2(BUFFER_WIDTH, BUFFER_HEIGHT ) * pix * 125);//125 lines				   
 	float  Depth = D_Scale(Normals_Depth(texcoords,0).w), AO_Scale = 0.5,FakeAO = Debug == 1 ? (
 				   Normals_Depth(texcoords ,1).w +			   
 				   Normals_Depth(texcoords ,2).w +
@@ -1745,7 +1749,7 @@ float4 MixOut(float2 texcoords)
 	if(Debug == 0)
 		Done.rgb = Depth_Guide ? Layer.rgb * float3((Depth/Guide> 0.998),1,(Depth/Guide > 0.998))  : Layer.rgb;
 	else if(Debug == 1)//(1-Depth/FakeAO * 0.75)  ;
-		Done.rgb = lerp(lerp(smoothstep(0.5,1,(Output * 0.5625) + FakeAO),1,smoothstep(0,1,Depth) == 1),Output,Dark_Mode); //This fake AO is a lie..........
+		Done.rgb = lerp(lerp(smoothstep(0.5,1,(Output * 0.5) + FakeAO),1,smoothstep(0,1,Depth) == 1),Output,Dark_Mode); //This fake AO is a lie..........
 	else if(Debug == 2)
 		Done.rgb = DirectLighting( texcoords, 0).rgb;
 	else
@@ -2329,5 +2333,9 @@ ui_tooltip = "Beta: Global Illumination Secondary Output.²"; >
 //
 // Made the sampling radius change every other frame to grab a larger sample base. So that the TAA can blend them and provide a more accurate / better GI output.
 // It been fun learning on this shader. I do hope you enjoy this update.
+//
+// Update 3.0.7
+//
+// Simple HDR adjustment. Made sure it works with HDR output. PCGI Fade now works the same as GloomAO. Since I need the shaders to have parity.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

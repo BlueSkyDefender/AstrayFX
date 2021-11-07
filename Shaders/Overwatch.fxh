@@ -1,7 +1,7 @@
 ////----------------------------------------//
 ///SuperDepth3D Overwatch Automation Shader///
 //----------------------------------------////
-// Version 2.1.1
+// Version 2.1.5
 //---------------------------------------OVERWATCH---------------------------------------//
 // If you are reading this stop. Go away and never look back. From this point on if you  //
 // still think it's is worth looking at this..... Then no one can save you or your soul. //
@@ -159,10 +159,20 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DB_Y 2
 	#define DB_W 7
 #elif (App == 0x142EDFD6 || App == 0x2A0ECCC9 || App == 0x8B0C2031 )	//DOOM 2016
-	#define DA_Y 20.0
-	#define DA_X 0.03125
-	#define DB_Y 3
+	#define DA_Y 23.125
+	#define DA_Z -0.00010
+	#define DA_X 0.071
+	#define DB_Z 0.1125
+	#define DF_Y 0.01875
+	#define DB_Y 1 //Auto Mode Works But this game is better locked.
+	#define DE_X 3
+	#define DE_Y 0.500
+	#define DE_Z 0.4375
 	#define DB_W 8
+    #define DG_Z 0.001
+	#define BM 1
+	#define DG_X 0.145
+	#define PE 1
 #elif (App == 0x17232880 || App == 0x9D77A7C4 || App == 0x22EF526F )	//CoD:Black Ops | CoD:MW2 |CoD:MW3
 	#define DA_Y 12.5
 	#define DB_Y 3
@@ -261,16 +271,20 @@ static const int FOV = 0;                               //Set Game FoV
 	#define NF 1
 	#define RH 1
 #elif (App == 0xF22A9C7D || App == 0x5416A79D ) //SOMA
-	#define DA_Y 17.5
-	#define DA_Z 0.0005
-	#define DA_X 0.1375
+	#define DA_Y 23.125 //21.25 //25.0
+	#define DA_X 0.1025 //0.110 //0.095
 	#define DB_Y 5
-	//#define DB_W 38
-	#define DE_W 0.1875
+	#define BM 1
+	#define DG_X 0.15625
+	#define DA_Z -0.00025
+	#define DG_W 0.1
+	#define DB_W 38
+	#define DG_Z 0.341
 	#define DE_X 3
 	#define DE_Y 0.5
 	#define DE_Z 0.375
 	#define DF_X 0.25
+	#define FV 1
 	#define RH 1
 #elif (App == 0x6FB6410B ) //Cryostasis
 	#define DA_Y 13.75
@@ -744,6 +758,7 @@ static const int FOV = 0;                               //Set Game FoV
 	#define NF 1
 #elif (App == 0x88004DC9 || App == 0x1DDA9341) //Strange Brigade DX12 & Vulkan
 	#define DA_X 0.0625
+	#define DF_Y 0.02
 	#define DA_Y 20.0
 	#define DA_Z 0.0001
 	#define DB_Y 5
@@ -1047,6 +1062,8 @@ static const int FOV = 0;                               //Set Game FoV
 #elif (App == 0x71170B42 ) //Blood: Fresh Suppy
 	#define DA_Y 212.5
 	#define DA_X 0.175
+	#define BM 1
+	#define DG_X 0.275
 	#define DB_Y 4
 	#define DE_X 1
 	#define DE_Y 0.375
@@ -1576,11 +1593,11 @@ static const int FOV = 0;                               //Set Game FoV
 	#define RH 1
 #elif (App == 0x54D4EAFA) //Sekiro Shadows Die Twice
 	#define DA_W 1
-	//#define DA_X 0.0625
+    #define DF_Y 0.025
 	#define DA_X 0.10
-	//#define DA_Y 59.375
-	#define DA_Y 30.0
-	#define DA_Z 0.000375
+	#define DA_Y 31.25
+	#define DA_Z -0.0525
+	#define DG_W 0.25 //Pop out
 	//#define DB_Z 0.125
 	#define DB_Y 1
 	#define DE_X 2
@@ -1831,8 +1848,9 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DS 1
 #elif (App == 0x5C0EBBE9 ) //A Plague Tale Innocence
 	#define DA_W 1
-	#define DA_X 0.05
-	#define DA_Y 33.75
+	#define DA_X 0.050
+    #define DF_Y 0.025
+	#define DA_Y 33.00
 	#define DB_Y 3
 	#define DE_X 2
 	#define DE_Y 0.500
@@ -2040,6 +2058,7 @@ static const int FOV = 0;                               //Set Game FoV
     //#define DB_X 1
 	#define DA_Y 12.5
 	#define DA_X 0.075
+	#define DF_Y 0.0125
 	//#define DF_Y 0.1
 	#define DB_Y 4
 	//#define DB_Z 0.125
@@ -2167,7 +2186,7 @@ static const int FOV = 0;                               //Set Game FoV
 	#define PE 1
 	#define DS 1
 	#define RH 1
-#elif (App == 0xAA5644F9 ) //Need For Speed Heat
+#elif (App == 0xAA5644F9 || App == 0x1981FECC ) //Need For Speed: Heat | Payback
 	#define DA_W 1
 	#define DA_Y 12.5
 	#define DA_X 0.1
@@ -2179,29 +2198,21 @@ static const int FOV = 0;                               //Set Game FoV
 	//#define DE_Y 0.450
 	//#define DE_Z 0.375
 	#define PE 1
+	#define DA 1
 #elif (App == 0xBD8B2F39 ) //Assassin's Creed Odyssey
 	#define DA_W 1
-	//#define DB_X 1
 	#define DA_Y 30.0
-	#define DA_X 0.050
-	#define DF_Y 0.030
+	#define DA_X 0.05
+	#define DF_Y 0.025
 	#define DB_Y 4
 	//#define DB_Z 0.125
-	#define DA_Z -1.000
+	#define DA_Z -0.3
 	#define DE_X 2
-	//#define DE_Y 0.250
+	#define DE_Y 0.250
 	#define DE_Z 0.375
+	#define DG_W 0.4 //Pop out allowed
 	#define PE 1
 	#define FV 1
-	//#define DA 1
-	//#define DS 1
-	//#define RH 1
-	//#define NF 1
-	//#define SP 1
-	//#define DD_X 0.625
-	//#define DD_Y 0.700
-	//#define DD_Z 0.600
-	//#define DD_W -0.425
 #elif (App == 0x3D00A2BC ) //SM64 us f3dx2e
 	#define DA_Y 12.5
 	#define DA_X 0.050
@@ -2610,6 +2621,19 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DG_X 0.165
 	#define PE 1
 	#define NW 1
+#elif (App == 0x19D0F410 ) //Zombie Army Trilogy
+	#define DA_Y 12.5
+	#define DA_X 0.155
+	#define DA_Z -0.00025
+	#define DB_Y 5
+	#define DE_X 1
+	#define DE_Y 0.375
+	#define DE_Z 0.375
+	#define DG_W 0.7
+	//#define BM 1
+	//#define DG_X 0.165
+	#define PE 1
+	#define NW 1
 #else
 	#define NP 1 //No Profile
 #endif
@@ -2794,7 +2818,7 @@ float3 Weapon_Profiles(float WP ,float3 Weapon_Adjust) //Tried Switch But, can't
     if (WP == 7)
         Weapon_Adjust = float3(0.276,20.0,9.5625);    //WP 5  | Skyrim: SE
     if (WP == 8)
-        Weapon_Adjust = float3(0.338,20.0,9.20);      //WP 6  | DOOM 2016
+        Weapon_Adjust = float3(0.338,21.0,9.1375);      //WP 6  | DOOM 2016
     if (WP == 9)
         Weapon_Adjust = float3(0.255,177.5,63.025);   //WP 7  | CoD:Black Ops | CoD:MW2 | CoD:MW3
     if (WP == 10)
