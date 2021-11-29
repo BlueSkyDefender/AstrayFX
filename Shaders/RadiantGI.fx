@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 3.0.6
+//For Reshade 3.0+ PCGI Ver 3.0.8
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -294,16 +294,6 @@ uniform float GI_Ray_Length <
 	ui_category = "Global Illumination";
 > = 250;
 
-uniform float Trim <
-	ui_type = "slider";
-	ui_min = 0.0; ui_max = 1.0;
-	ui_label = "Trim";
-	ui_tooltip = "Trim GI by limiting how far the GI is able to effect the objects around them.\n"
-				 "Directional Sky Color is negatively impacted by this option.\n"
-			     "Default is [0.50] and Zero is Off.";
-	ui_category = "Global Illumination";
-> = 0.5;
-
 uniform float Target_Lighting <
 	ui_type = "slider";
 	ui_min = -1.0; ui_max = 1.0;
@@ -342,15 +332,6 @@ uniform float2 Reflectivness <
 			     "Default is [1.0 | 0.5]. One is Max Diffusion and the value is length.";
 	ui_category = "Global Illumination";
 > = float2(1.0,0.5);
-
-uniform bool Emissive_Mode <
-	ui_label = "Emissive Mode";
-	ui_tooltip = "Lets the shader make all bright objects''Emissive Objects,'' based on approximated information from the emitter.\n"
-				 "Directional Sky Color is negatively impacted by this option.\n"
-			 	"This also makes GI less accurate.\n"
-			     "Default is Off.";
-	ui_category = "Global Illumination";
-> = false;
 
 uniform bool Scattering<
 	ui_label = "Subsurface Light Transport";
@@ -441,12 +422,21 @@ uniform float SSS_Seek <
 > = 0.25;
 #endif
 
-uniform bool Sky_Contribution <
-	ui_label = "Directional Sky Color";
-	ui_tooltip = "Lets you use Sky Color Information to contribute too your game.\n"
-			     "Default is Off.";
+uniform int Sky_Emissive_Selection < //Emissive_Mode //Sky_Contribution
+	ui_type = "combo";
+    ui_label = "Directional Sky & Emissive Mode";
+    ui_tooltip = "Use this to add Directional Sky and or Emissive Mode.\n"
+    			"\n"
+				"Directional Sky Color:\n"
+				"Allows for the use of Sky Color Contribution to effect the world directly.\n"
+    			"\n"
+				"Emissive Mode:\n"
+				"Make all bright objects''Emissive Objects,'' based on approximated information from the emitter.\n"
+				"\n"
+    			"Default is Off.";
+    ui_items = "Off\0Directional Sky Color\0Emissive Mode\0Sky & Emissive Mode\0";
 	ui_category = "Supplemental Contributions";
-> = false;
+    > = 0;
 
 uniform float GI_Sky_Saturation <
 	ui_type = "slider";
@@ -487,6 +477,17 @@ uniform float2 PCGI_2DTexture_Detail <
 #else
 static const int2 PCGI_2DTexture_Detail = 0;
 #endif
+
+uniform float Trim <
+	ui_type = "slider";
+	ui_min = 0.0; ui_max = 1.0;
+	ui_label = "Trim";
+	ui_tooltip = "Trim GI by limiting how far the GI is able to effect the objects around them.\n"
+				 "Directional Sky Color is negatively impacted by this option.\n"
+				 "Use this mostly for Emissive Mode.\n"
+			     "Default is [0.0] and Zero is Off.";
+	ui_category = "Supplemental Contributions";
+> = 0.0;
 
 #if Controlled_Blend
 uniform float Blend <
@@ -711,6 +712,13 @@ uniform float clock < source = "timer"; >;             // A timer that starts wh
 texture TexName < source =  LUT_File_Name; > { Width =  Tile_SizeXY *  Tile_Amount; Height =  Tile_SizeXY ; };
 sampler Sampler { Texture =  TexName; };
 #endif
+
+int2 Sky_Emissive_Bool()
+{
+	int Sky_Bool = Sky_Emissive_Selection == 1 || Sky_Emissive_Selection == 3 ? 1 : 0;
+	int Emissive_Bool = Sky_Emissive_Selection == 2 || Sky_Emissive_Selection == 3 ? 1 : 0;
+	return int2(Sky_Bool,Emissive_Bool);
+}
 
 float Scale_PCGI_Fade()
 {
@@ -1364,7 +1372,7 @@ float4 Denoise(sampler Tex, float2 texcoords, int SXY, int Dir , float R )
 float4 BBColor(float2 texcoords, int Mips)
 {   float LL_Comp = 0.5; //Wanted to automate this but it's really not need.
 	float4 BBC = tex2Dlod(PCGIcurrColor,float4(texcoords,0,Mips)).rgba;//PrepColor(texcoords, 0, Mips);
-	BBC.rgb = Sky_Contribution ? BBC.rgb : BBC.rgb * ( 1-DepthMDC(texcoords, 0) );
+	BBC.rgb = Sky_Emissive_Bool().x ? BBC.rgb : BBC.rgb * ( 1-DepthMDC(texcoords, 0) );
 	//	BBC.rgb = (BBC.rgb - 0.5) * (LL_Comp + 1.0) + 0.5;
 	//	return BBC + (LL_Comp * 0.5625);
 	return BBC;
@@ -1432,10 +1440,10 @@ float RadianceFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2
 	float4 v = float4(normalize(ddiff), length(ddiff));
 	float Mnormals = abs(Reflect()) < 1 ? lerp(3,0,saturate(dot(float3(0,1,0),normals))) : 3, Trimming = lerp(1,5000,saturate(Trim)) ;
 	//Emitter & Recever [With emulated Back-Face lighting.]
-	float giE_Selection = Emissive_Mode ? dot( 1-v.xyz   , 1-Normals_Depth(texcoord+AB, Mnormals ).xyz ) : dot( -v.xyz   , Normals_Depth(texcoord+AB, Mnormals ).xyz );
+	float giE_Selection = Sky_Emissive_Bool().y ? dot( 1-v.xyz   , 1-Normals_Depth(texcoord+AB, Mnormals ).xyz ) : dot( -v.xyz   , Normals_Depth(texcoord+AB, Mnormals ).xyz );
 	float2 giE_R =  max(float2(   step(   0.0,   giE_Selection    ),   dot( v.xyz, normals )   )   ,0);
-	float FF_Dampen = Emissive_Mode ? PI*20 : PI*10; //Emulated Back-Face lighting Adjustment.
-	return saturate((100 * giE_R.x * giE_R.y) / ( lerp(Trimming,1,STDepth * Sky_Contribution) * (v.w*v.w) + FF_Dampen) );
+	float FF_Dampen = Sky_Emissive_Bool().y ? PI*20 : PI*10; //Emulated Back-Face lighting Adjustment.
+	return saturate((100 * giE_R.x * giE_R.y) / ( lerp(Trimming,1,STDepth * Sky_Emissive_Bool().x) * (v.w*v.w) + FF_Dampen) );
 }
 /* //This Code is Disabled Not going to use in RadiantGI
 float AmbientOcclusionFF(in float2 texcoord,in float3 ddiff,in float3 normals, in float2 AB)
@@ -2337,5 +2345,9 @@ ui_tooltip = "Beta: Global Illumination Secondary Output.²"; >
 // Update 3.0.7
 //
 // Simple HDR adjustment. Made sure it works with HDR output. PCGI Fade now works the same as GloomAO. Since I need the shaders to have parity.
+//
+// Update 3.0.8
+//
+// Set the default for Trim to off and adjusted a few things. Changed the UI a little bit to make it easier on new users.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

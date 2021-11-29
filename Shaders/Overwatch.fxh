@@ -1,7 +1,7 @@
 ////----------------------------------------//
 ///SuperDepth3D Overwatch Automation Shader///
 //----------------------------------------////
-// Version 2.1.5
+// Version 2.1.7
 //---------------------------------------OVERWATCH---------------------------------------//
 // If you are reading this stop. Go away and never look back. From this point on if you  //
 // still think it's is worth looking at this..... Then no one can save you or your soul. //
@@ -715,7 +715,8 @@ static const int FOV = 0;                               //Set Game FoV
 	#define RH 1
 #elif (App == 0x67A4A23A ) //Crash Bandicoot N.Saine Trilogy
 	#define DA_Y 7.5
-	#define DA_Z 0.250
+    #define DF_Y 0.0625
+	#define DA_Z -0.250
 	#define DA_X 0.1
 	#define DB_Y 4
 	#define DF_W 0.580
@@ -1103,11 +1104,16 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DE_Z 0.375
 	#define DF_X -0.175
 #elif (App == 0x6061750E ) //Mirror's Edge
-	#define DA_Y 12.0
-	#define DA_Z 0.001
-	#define DA_X 0.03
-	#define DB_Y 4
+	#define DA_Y 12.25
+	#define DF_Y 0.020
+	#define DA_X 0.040
+	#define DB_Y 5
+    #define DB_Z 0.01
+	#define DE_X 1
+	#define DE_Y 0.50
+	#define DE_Z 0.375
 	#define DB_W 70
+	#define DS 1
 #elif (App == 0xC3AF1228 || App == 0x95A994C8 ) //Spellforce
 	#define DA_Y 145.0
 	#define DA_Z 0.001
@@ -1245,14 +1251,15 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DA_Y 18.75
 	#define DA_Z 0.0005
 	#define DA_X 0.055
+	#define DF_Y 0.02
 	#define DB_Z 0.075
 	#define DB_Y 1
 	#define DB_W 3
 	#define DE_X 3
 	#define DE_Y 0.425
 	#define DE_Z 0.375
-	#define DE_W 0.3975
-	#define DF_X 0.250
+	#define DG_Z 0.3975
+	#define DF_X 0.225
 	#define NW 1
 #elif (App == 0x2ECAAF29 || App == 0xE19E4830 || App == 0xE19E4830  ) //Half-Life 2 | Left 4 Dead 2
 	#define DA_Y 8.75
@@ -1440,6 +1447,7 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DF 1
 #elif (App == 0xF55F26A1 ) //Tekken 7
 	#define DA_W 1
+    #define DF_Y 0.025
 	#define DA_Y 100.0
 	#define DA_Z 0.0001
 	#define DB_Y 1
@@ -1496,22 +1504,15 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DB_Z 0.025
 #elif (App == 0x7F1A5568 ) //DarkSiders III
 	#define DA_W 1
-	#define DA_X 0.05
-	#define DA_Y 62.5
-	#define DA_Z 0.000125
-	#define DB_Y 5
+	#define DA_X 0.0625
+	#define DA_Y 50.0
+	#define DA_Z 0.0001
+	#define DB_Y 4
 	#define DE_X 1
 	#define DE_Y 0.250
 	#define DE_Z 0.4
-	#define DE_W 0.450
-#elif (App == 0x837F12C9 ) //QuantumBreak
-	#define DA_X 0.0375
-	#define DA_Y 20.0
-	#define DA_Z 0.000125
-	#define DB_Y 1
-	//#define DE_X 1
-	//#define DE_Y 0.625
-	//#define DE_Z 0.375
+	#define DG_Z 0.450
+	#define DG_W 0.125
 #elif (App == 0xB4C116F7 ) //Nioh
 	#define DA_W 1
 	#define DA_X 0.1
@@ -1889,9 +1890,9 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DE_X 1
 	#define DE_Y 0.500
 	#define DE_Z 0.375
-#elif (App == 0x49F7B9C0 ) //Control DX12
+#elif (App == 0x49F7B9C0 || App == 0x837F12C9 ) //Control DX12 | QuantumBreak DX11
 	#define DA_X 0.05625
-	#define DF_Y 0.05625
+	#define DF_Y 0.0625
 	#define DA_Y 18.75
 	#define DB_Y 3
 	#define DE_X 1
@@ -2042,15 +2043,16 @@ static const int FOV = 0;                               //Set Game FoV
 #elif (App == 0xF9341C1 ) //Valheim
 	#define DA_W 1
     #define DB_X 1
-	#define DA_Y 13.75
-	#define DA_X 0.051
-	//#define DF_Y 0.1
+	#define DA_Y 10.0
+	#define DA_X 0.05125
+	#define DF_Y 0.005
 	#define DB_Y 2
-	#define DB_Z 0.125
+	//#define DB_Z 0.125
 	#define DA_Z 0.001
 	#define DE_X 2
-	#define DE_Y 0.300
-	#define DE_Z 0.300
+	#define DE_Y 0.500
+	#define DE_Z 0.375
+	#define DG_W 0.15
 	#define PE 1
 	#define DA 1
 #elif (App == 0x8C8F544C ) //Witcher 3
@@ -2408,12 +2410,12 @@ static const int FOV = 0;                               //Set Game FoV
 	#define DA_W 1
 	#define DA_Y 245.0
 	#define DA_Z 0.0000025 // Magic
-	#define DA_X 0.0451
-	#define DF_Y 0.001     // Magic
-	#define DB_Z 0.05
+	#define DA_X 0.050
+	#define DF_Y 0.047
+	#define DB_Z 0.0625
 	#define DB_Y 1
 	#define BM 1
-	#define DG_X 0.1825
+	#define DG_X 0.180
 	#define DE_X 3
 	#define DE_Y 0.650
 	#define DE_Z 0.400
@@ -2634,6 +2636,56 @@ static const int FOV = 0;                               //Set Game FoV
 	//#define DG_X 0.165
 	#define PE 1
 	#define NW 1
+#elif (App == 0x8842D13 ) //Genshin Impact
+	#define DA_W 1
+    #define DB_X 1
+	#define DA_Y 9.375
+	#define DA_X 0.1
+	#define DA_Z -0.01
+	#define DB_Y 5
+	#define DE_X 1
+	//#define DE_Y 0.4375
+	#define DE_Z 0.375
+	#define DF_Y 0.01
+	#define DG_W 0.1
+	#define NW 1
+#elif (App == 0xEEAF4DE ) //Guardians of the galaxy
+    #define DA_W 1
+	#define DA_Y 54.0
+	#define DA_X 0.05
+	#define DB_Y 1
+	#define DB_Z 0.12
+	#define DE_X 1
+	#define DE_Y 0.375
+	#define DE_Z 0.400
+	#define DF_Y 0.0375
+	#define DG_W 0.2
+	#define DA 1
+	#define PE 1
+#elif (App == 0x967BB1CC ) //HROT
+	#define DA_X 0.055
+	#define DF_Y 0.025
+	#define DA_Y 150.0
+	#define DB_Z 0.0875
+	#define DB_Y 2
+	#define DE_X 3
+	#define DE_Y 0.550
+	#define DE_Z 0.375
+	#define WSM 2 //Weapon Settings Mode
+	#define DB_W 11
+	#define DS 1 
+	#define PE 1
+#elif (App == 0x11763BB7 ) //FATAL Frame Maiden of the Black Water.... Too Damn spooky....
+	#define DA_X 0.0825
+	#define DF_Y 0.04125
+	#define DA_Y 16.25
+	#define DB_Z 0.275
+	#define DB_Y 4
+	#define DE_X 1
+	#define DE_Y 0.250
+	#define DE_Z 0.375
+	#define PE 1
+	#define DA 1
 #else
 	#define NP 1 //No Profile
 #endif
@@ -2808,7 +2860,7 @@ float3 Weapon_Profiles(float WP ,float3 Weapon_Adjust) //Tried Switch But, can't
 {   if (WP == 2)
         Weapon_Adjust = float3(0.425,5.0,1.125);      //WP 0  | ES: Oblivion
     if (WP == 3)
-        Weapon_Adjust = float3(0.276,16.25,9.2);      //WP 1  | BorderLands
+        Weapon_Adjust = float3(0.276,16.25,9.15);      //WP 1  | BorderLands
     if (WP == 4)
         Weapon_Adjust = float3(0.5,32.5,7.15);        //WP 2  | BorderLands 2
     if (WP == 5)
@@ -2818,7 +2870,7 @@ float3 Weapon_Profiles(float WP ,float3 Weapon_Adjust) //Tried Switch But, can't
     if (WP == 7)
         Weapon_Adjust = float3(0.276,20.0,9.5625);    //WP 5  | Skyrim: SE
     if (WP == 8)
-        Weapon_Adjust = float3(0.338,21.0,9.1375);      //WP 6  | DOOM 2016
+        Weapon_Adjust = float3(0.338,21.0,9.1375);    //WP 6  | DOOM 2016
     if (WP == 9)
         Weapon_Adjust = float3(0.255,177.5,63.025);   //WP 7  | CoD:Black Ops | CoD:MW2 | CoD:MW3
     if (WP == 10)
@@ -2979,7 +3031,7 @@ float3 Weapon_Profiles(float WP ,float3 Weapon_Adjust) //Could reduce from 76 to
     if (WP == 10)
         Weapon_Adjust = float3(0.0,0.0,0.0);          //WP 8  | Game
     if (WP == 11)
-        Weapon_Adjust = float3(0.0,0.0,0.0);          //WP 9  | Game
+        Weapon_Adjust = float3(4.100,25.0,0.0);       //WP 9  | HROT
     if (WP == 12)
         Weapon_Adjust = float3(0.0,0.0,0.0);          //WP 10 | Game
     if (WP == 13)
