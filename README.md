@@ -60,4 +60,4 @@ https://github.com/BlueSkyDefender/Depth3D/blob/master/Shaders/Game_Help.txt<br 
 Discord Server [Discord](https://discord.gg/W2f7YhX)<br />
 
 **Want to dontate?:**
-If you enjoyed these shaders and like to donate you can do so at [PayPal](https://paypal.me/BlueSkyDefender) or [BuyMeACoffee](https://www.buymeacoffee.com/BlueSkyDefender)
+If you enjoyed these shaders and like to donate you can do so at [BuyMeACoffee](https://www.buymeacoffee.com/BlueSkyDefender)
