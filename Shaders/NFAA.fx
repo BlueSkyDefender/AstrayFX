@@ -70,25 +70,9 @@ uniform int View_Mode <
     ui_category = "NFAA";
 > = 0;
 
-uniform bool HFR_AA <
-    ui_label = "HFR AA";
-    ui_tooltip = "This allows most monitors to assist in AA if your FPS is 60 or above and Locked to your monitors refresh-rate.";
-    ui_category = "HFRAA";
-> = false;
-
-uniform float HFR_Adjust <
-    ui_type = "drag";
-    ui_min = 0.0; ui_max = 1.0;
-    ui_label = "HFR AA Adjustment";
-    ui_tooltip = "Use this to adjust HFR AA.\n"
-                 "Default is 1.00";
-    ui_category = "HFRAA";
-> = 0.5;
-
 //Total amount of frames since the game started.
 uniform uint framecount < source = "framecount"; >;
 ////////////////////////////////////////////////////////////NFAA////////////////////////////////////////////////////////////////////
-#define Alternate framecount % 2 == 0
 #define pix float2(BUFFER_RCP_WIDTH, BUFFER_RCP_HEIGHT)
 
 texture BackBufferTex : COLOR;
@@ -174,14 +158,6 @@ float4 Out(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Targe
     return float4(Color,1.);
 }
 
-float4 PostFilter(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
-{ float Shift;
-  if(Alternate && HFR_AA)
-    Shift = pix.x;
-
-    return tex2D(BackBuffer, texcoord +  float2(Shift * saturate(HFR_Adjust),0.0));
-}
-
 ///////////////////////////////////////////////////////////ReShade.fxh/////////////////////////////////////////////////////////////
 
 // Vertex shader generating a triangle covering the entire screen
@@ -199,11 +175,6 @@ technique Normal_Filter_Anti_Aliasing
         {
             VertexShader = PostProcessVS;
             PixelShader = Out;
-        }
-            pass HFR_AA
-        {
-            VertexShader = PostProcessVS;
-            PixelShader = PostFilter;
         }
 
 }
