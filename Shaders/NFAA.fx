@@ -55,17 +55,16 @@ uniform float EdgeDetectionThreshold < __UNIFORM_DRAG_FLOAT1
     ui_min = 0.005; ui_max = 0.1;
 > = 0.005;
 
-uniform float SearchStepSize < __UNIFORM_DRAG_FLOAT1
-    ui_label = "Search Step Size";
+uniform float SearchWidth < __UNIFORM_DRAG_FLOAT1
+    ui_label = "Search Width";
     ui_tooltip = "Determines the radius NFAA will search for edges.\n"
-                 "Default is 1.00";
-    ui_min = 0.0; ui_max = 4.0;
-> = 1.00;
+                 "Default is 1.500";
+    ui_min = 0.5; ui_max = 4.5;
+> = 1.500;
 
-uniform int DebugOutput <
-    ui_type = "combo";
-    ui_items = "None\0Edge Mask View\0Normal View\0Fake DLSS\0";
+uniform int DebugOutput < __UNIFORM_COMBO_INT1
     ui_label = "Debug Output";
+    ui_items = "None\0Edge Mask View\0Normal View\0Fake DLSS\0";
     ui_tooltip = "Edge Mask View gives you a view of the edge detection.\n"
                  "Normal View gives you an view of the normals created.\n"
                  "Fake DLSS is NV_AI_DLSS Parody experiance..........";
@@ -90,67 +89,94 @@ float4 GetBB(float2 texcoord : TEXCOORD)
 
 float4 NFAA(float2 texcoord)
 {
-	// The Edge Seeking code can be adjusted to look for longer edges.
-    // But, I don't think it's really needed.
-    float4 NFAA = 1.0;
-	float Mask = 1.0;
-    float t, l, r, b;
-    float SSS = SearchStepSize;
+    float SW = SearchWidth;
     float EDT = EdgeDetectionThreshold;
     
 	if (DebugOutput == 3) // Fake DLSS
 	{
-        SSS = 5.0;
+        SW = 4.5;
         EDT = 0.005;
     }
-    
-	float2 SW = BUFFER_PIXEL_SIZE * SSS;
-    float2 UV = texcoord.xy;
-    
-    // Find Edges
-    t = LI(GetBB(float2(UV.x, UV.y - SW.y)).rgb);
-    b = LI(GetBB(float2(UV.x, UV.y + SW.y)).rgb);
-    l = LI(GetBB(float2(UV.x - SW.x, UV.y)).rgb);
-    r = LI(GetBB(float2(UV.x + SW.x, UV.y)).rgb);
-    float2 n = float2(t - b, l - r);
-	float nl = length(n);
 
+	float2 SS = SearchWidth * BUFFER_PIXEL_SIZE;
+
+    // Find Edges
+	// Enhanced edge detection with linear sampling
+	//  +---+---+---+---+---+
+	//  |   |   | a | b |   |
+	//  +---+---+---x---+---+
+	//  | m | n | c | d |   |
+	//  +---x---+---+---+---+
+	//  | o | p |   | e | f |
+	//  +---+---+---+---x---+
+	//  |   | i | j | g | h |
+	//  +---+---x---+---+---+
+	//  |   | k | l |   |   |
+	//  +---+---+---+---+---+
+	float4 ts, ls, rs, bs;
+	ts = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(0.5, -SW), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+	rs = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(SW, 0.5), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+	bs = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-0.5, SW), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+	ls = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-SW, 0.5), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
     
-    // Seek aliasing and apply AA. Think of this as basically blur control.
-    if (nl < EDT) // face
-	{
-		NFAA = GetBB(UV);
-    }
-    else // edge
+	float t, l, r, b;
+	float2 UV = texcoord.xy;
+    t = LI(GetBB(float2(UV.x, UV.y - SS.y)).rgb);
+    b = LI(GetBB(float2(UV.x, UV.y + SS.y)).rgb);
+    l = LI(GetBB(float2(UV.x - SS.x, UV.y)).rgb);
+    r = LI(GetBB(float2(UV.x + SS.x, UV.y)).rgb);
+    float2 n = float2(t - b, r - l);
+	
+	// float t, l, r, b;
+	// t = LI(ts.rgb);
+    // b = LI(bs.rgb);
+    // l = LI(ls.rgb);
+    // r = LI(rs.rgb);
+    // float2 n = float2(t - b, r - l);
+	float nl = length(n);
+    
+	float Mask = 1.0;
+    float4 Color = GetBB(texcoord);
+    if (nl >= EDT)
 	{
 		// Lets make that mask for a sharper image.
-		// 1.0 - 10.0 * nl
-		// 0 if nl >= 0.1
+		// Mask Formula: 1.0 - 10.0 * nl.
+		// Mask is 0 if nl >= 0.1.
 		Mask = saturate(mad(nl, -10.0, 1.0));
 
-        n *= BUFFER_PIXEL_SIZE / nl;
-        if (DebugOutput == 3) n *= 2.0; // Fake DLSS
+        SS = BUFFER_PIXEL_SIZE * n / nl;
+        if (DebugOutput == 3) SS *= 2.0; // Fake DLSS
+	
+		//  +---+---+---+---+---+
+		//  |\\\|   | a | b |   |
+		//  +---+---+---x---+---+
+		//  | m |\\\| c | d |   |
+		//  +---x---+---+---+---+
+		//  | o | p |\\\| e | f |
+		//  +---+---+---+---x---+
+		//  |   | i | j |\\\| h |
+		//  +---+---x---+---+---+
+		//  |   | k | l |   |\\\|
+		//  +---+---+---+---+---+
+        ts = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(0.7, -2.1), SS, texcoord), 0.0, 0.0)) * 0.75;
+		rs = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(2.1, 0.7), SS, texcoord), 0.0, 0.0)) * 0.9;
+		bs = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-0.7, 2.1), SS, texcoord), 0.0, 0.0)) * 0.75;
+		ls = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-2.1, -0.7), SS, texcoord), 0.0, 0.0)) * 0.9;
 
-        float4 o = GetBB(UV),
-                t0 = GetBB(UV + float2(n.x, -n.y) * 0.5) * 0.9,
-                t1 = GetBB(UV - float2(n.x, -n.y) * 0.5) * 0.9,
-                t2 = GetBB(UV + n * 0.9) * 0.75,
-                t3 = GetBB(UV - n * 0.9) * 0.75;
-
-		NFAA = lerp((o + t0 + t1 + t2 + t3) / 4.3, o, Mask);
+		Color = lerp((Color + ts + rs + bs + ls) / 4.3, Color, Mask);
     }
 
 	// DebugOutput
     if(DebugOutput == 1)
     {
-        NFAA.rgb = Mask;
+        Color.rgb = Mask;
     }
     else if (DebugOutput == 2)
     {
-        NFAA.rgb = float3(-float2(-(r - l), -(t - b)) * 0.5 + 0.5, 1.0);
+        Color.rgb = float3(mad(n.yx, 0.5, 0.5), 1.0);
     }
 
-	return NFAA;
+	return Color;
 }
 
 float4 Out(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
