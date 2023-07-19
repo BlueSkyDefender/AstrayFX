@@ -43,35 +43,32 @@
 #include "ReShadeUI.fxh"
 #include "ReShade.fxh"
 
-uniform int AA_Adjust <
-    ui_type = "drag";
-    ui_min = 1; ui_max = 128;
-    ui_label = "AA Power";
-    ui_tooltip = "Use this to adjust the AA power.\n"
-                 "Default is 16";
-    ui_category = "NFAA";
-> = 16;
+uniform int EdgeDetectionType < __UNIFORM_COMBO_INT1
+	ui_items = "Luminance edge detection\0Perceived Luminance edge detection\0";
+	ui_label = "Edge Detection Type";
+> = 1;
 
-uniform float Mask_Adjust <
-    ui_type = "drag";
-    ui_min = 0.0; ui_max = 4.0;
-    ui_label = "Mask Adjustment";
-    ui_tooltip = "Use this to adjust the Mask.\n"
+uniform float EdgeDetectionThreshold < __UNIFORM_DRAG_FLOAT1
+	ui_label = "Edge Detection Threshold";
+    ui_tooltip = "If NFAA misses some edges try lowering this.\n"
+				 "Default is 0.063";
+    ui_min = 0.005; ui_max = 0.1;
+> = 0.005;
+
+uniform float SearchStepSize < __UNIFORM_DRAG_FLOAT1
+    ui_label = "Search Step Size";
+    ui_tooltip = "Determines the radius NFAA will search for edges.\n"
                  "Default is 1.00";
-    ui_category = "NFAA";
+    ui_min = 0.0; ui_max = 4.0;
 > = 1.00;
 
-uniform int View_Mode <
+uniform int DebugOutput <
     ui_type = "combo";
-    ui_items = "NFAA\0Mask View\0Normals\0DLSS\0";
-    ui_label = "View Mode";
-    ui_tooltip = "This is used to select the normal view output or debug view.\n"
-                 "NFAA Masked gives you a sharper image with applyed Normals AA.\n"
-                 "Masked View gives you a view of the edge detection.\n"
-                 "Normals gives you an view of the normals created.\n"
-                 "DLSS is NV_AI_DLSS Parody experiance..........\n"
-                 "Default is NFAA.";
-    ui_category = "NFAA";
+    ui_items = "None\0Edge Mask View\0Normal View\0Fake DLSS\0";
+    ui_label = "Debug Output";
+    ui_tooltip = "Edge Mask View gives you a view of the edge detection.\n"
+                 "Normal View gives you an view of the normals created.\n"
+                 "Fake DLSS is NV_AI_DLSS Parody experiance..........";
 > = 0;
 
 //Total amount of frames since the game started.
@@ -79,10 +76,11 @@ uniform uint framecount < source = "framecount"; >;
 
 ////////////////////////////////////////////////////////////NFAA////////////////////////////////////////////////////////////////////
 // sRGB Luminance
-float LI(in float3 value)
+static const float3 LuminanceVector[2] = {float3(0.2126, 0.7152, 0.0722), float3(0.299, 0.587, 0.114)};
+
+float LI(in float3 color)
 {
-    // return dot(value.rgb, float3(0.2126, 0.7152, 0.0722)); // sRGB luminance
-    return dot(value.rgb, float3(0.299, 0.587, 0.114)); // Perceived Luminance
+    return dot(color.rgb, LuminanceVector[EdgeDetectionType]);
 }
 
 float4 GetBB(float2 texcoord : TEXCOORD)
@@ -92,17 +90,21 @@ float4 GetBB(float2 texcoord : TEXCOORD)
 
 float4 NFAA(float2 texcoord)
 {
-    float4 NFAA; // The Edge Seeking code can be adjusted to look for longer edges.
-    float2 n; // But, I don't think it's really needed.
+	// The Edge Seeking code can be adjusted to look for longer edges.
+    // But, I don't think it's really needed.
+    float4 NFAA = 1.0;
+	float Mask = 1.0;
     float t, l, r, b;
-    float MA = Mask_Adjust;
-    float Rep = rcp(AA_Adjust);
-    if (View_Mode == 3) {
-        // DLSS
-        MA = 5.0;
-        Rep = rcp(128);
+    float SSS = SearchStepSize;
+    float EDT = EdgeDetectionThreshold;
+    
+	if (DebugOutput == 3) // Fake DLSS
+	{
+        SSS = 5.0;
+        EDT = 0.005;
     }
-    float2 SW = BUFFER_PIXEL_SIZE * MA;
+    
+	float2 SW = BUFFER_PIXEL_SIZE * SSS;
     float2 UV = texcoord.xy;
     
     // Find Edges
@@ -110,20 +112,24 @@ float4 NFAA(float2 texcoord)
     b = LI(GetBB(float2(UV.x, UV.y + SW.y)).rgb);
     l = LI(GetBB(float2(UV.x - SW.x, UV.y)).rgb);
     r = LI(GetBB(float2(UV.x + SW.x, UV.y)).rgb);
-    n = float2(t - b, l - r);
+    float2 n = float2(t - b, l - r);
 	float nl = length(n);
+
     
     // Seek aliasing and apply AA. Think of this as basically blur control.
-    if (nl < Rep)
+    if (nl < EDT) // face
 	{
-        // face
-          NFAA = GetBB(UV);
+		NFAA = GetBB(UV);
     }
-    else
+    else // edge
 	{
-        // edge
+		// Lets make that mask for a sharper image.
+		// 1.0 - 10.0 * nl
+		// 0 if nl >= 0.1
+		Mask = saturate(mad(nl, -10.0, 1.0));
+
         n *= BUFFER_PIXEL_SIZE / nl;
-        if (View_Mode == 3) n *= 2.0;
+        if (DebugOutput == 3) n *= 2.0; // Fake DLSS
 
         float4 o = GetBB(UV),
                 t0 = GetBB(UV + float2(n.x, -n.y) * 0.5) * 0.9,
@@ -131,38 +137,25 @@ float4 NFAA(float2 texcoord)
                 t2 = GetBB(UV + n * 0.9) * 0.75,
                 t3 = GetBB(UV - n * 0.9) * 0.75;
 
-        NFAA = (o + t0 + t1 + t2 + t3) / 4.3;
+		NFAA = lerp((o + t0 + t1 + t2 + t3) / 4.3, o, Mask);
     }
 
-    // Lets make that mask for a sharper image.
-    float Mask = nl * 5.0;
-    if (Mask > 0.025)
-        Mask = 1 - Mask;
-    else
-        Mask = 1;
-    // Super Evil Magic Number.
-    Mask = saturate(lerp(Mask, 1, -1));
+	// DebugOutput
+    if(DebugOutput == 1)
+    {
+        NFAA.rgb = Mask;
+    }
+    else if (DebugOutput == 2)
+    {
+        NFAA.rgb = float3(-float2(-(r - l), -(t - b)) * 0.5 + 0.5, 1.0);
+    }
 
-    // Final color
-    if(View_Mode == 0)
-    {
-        NFAA = lerp(NFAA, GetBB(UV), Mask);
-    }
-    else if(View_Mode == 1)
-    {
-        NFAA = Mask;
-    }
-    else if (View_Mode == 2)
-    {
-        NFAA = float3(-float2(-(r - l), -(t - b)) * 0.5 + 0.5, 1.0);
-    }
 	return NFAA;
 }
 
 float4 Out(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
 {
-	float3 Color = NFAA(texcoord).rgb;
-    return float4(Color, 1.0);
+	return NFAA(texcoord);
 }
 
 //*Rendering passes*//
