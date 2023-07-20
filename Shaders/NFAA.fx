@@ -228,20 +228,25 @@ float4 NFAA(float2 texcoord)
 
 		// calculate x/y coordinates on this slope at specified distance to origin
 		// parallel
-		float2 d0, d1;
+		float2 d0, d1, d2;
 		d0.x = sqrt(1.0 / (1 + m*m));
 		d0.y = m * d0.x;
 
-		// perpendicular
-		m = -rcp(m);
 		d1.x = sqrt(0.25 / (1 + m*m));
 		d1.y = m * d1.x;
 
-        float4 t0 = tex2Dlod(ReShade::BackBuffer, float4(mad(d0, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		float4 t1 = tex2Dlod(ReShade::BackBuffer, float4(mad(-d0, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		float4 t2 = tex2Dlod(ReShade::BackBuffer, float4(mad(d1, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		float4 t3 = tex2Dlod(ReShade::BackBuffer, float4(mad(-d1, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		color = lerp((color + t0 + t1 + t2 + t3) / 5, color, mask);
+		// perpendicular
+		m = -rcp(m);
+		d2.x = sqrt(1.0 / (1 + m*m));
+		d2.y = m * d0.x;
+
+        float4 t0 = 0.3 * tex2Dlod(ReShade::BackBuffer, float4(mad(d0, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+		float4 t1 = 0.3 * tex2Dlod(ReShade::BackBuffer, float4(mad(-d0, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+		float4 t2 = 0.7 * tex2Dlod(ReShade::BackBuffer, float4(mad(d1, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+		float4 t3 = 0.7 * tex2Dlod(ReShade::BackBuffer, float4(mad(-d1, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+		float4 t4 = 0.5 * tex2Dlod(ReShade::BackBuffer, float4(mad(d2, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+		float4 t5 = 0.5 * tex2Dlod(ReShade::BackBuffer, float4(mad(-d2, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+		color = lerp((color + t0 + t1 + t2 + t3 + t4 + t5) / 4, color, mask);
     }
 
 	// DebugOutput
