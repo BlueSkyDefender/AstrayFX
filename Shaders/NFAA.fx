@@ -51,7 +51,7 @@ uniform int EdgeDetectionType < __UNIFORM_COMBO_INT1
 uniform float EdgeDetectionThreshold < __UNIFORM_DRAG_FLOAT1
 	ui_label = "Edge Detection Threshold";
     ui_tooltip = "If NFAA misses some edges try lowering this slightly.\n"
-				 "Default is 0.063";
+				 "Default is 0.100";
     ui_min = 0.050; ui_max = 0.200;
 > = 0.100;
 
@@ -268,7 +268,7 @@ float4 Out(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Targe
 }
 
 //*Rendering passes*//
-technique Normal_Filter_Anti_Aliasing
+technique NFAA
 {
 		pass NFAA_Fast
         {
