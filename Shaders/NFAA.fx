@@ -50,17 +50,17 @@ uniform int EdgeDetectionType < __UNIFORM_COMBO_INT1
 
 uniform float EdgeDetectionThreshold < __UNIFORM_DRAG_FLOAT1
 	ui_label = "Edge Detection Threshold";
-    ui_tooltip = "If NFAA misses some edges try lowering this.\n"
+    ui_tooltip = "If NFAA misses some edges try lowering this slightly.\n"
 				 "Default is 0.063";
-    ui_min = 0.005; ui_max = 0.1;
-> = 0.005;
+    ui_min = 0.050; ui_max = 0.200;
+> = 0.100;
 
 uniform float SearchWidth < __UNIFORM_DRAG_FLOAT1
     ui_label = "Search Width";
     ui_tooltip = "Determines the radius NFAA will search for edges.\n"
-                 "Default is 1.500";
-    ui_min = 0.5; ui_max = 4.5;
-> = 1.500;
+                 "Default is 1.000";
+    ui_min = 0.500; ui_max = 1.500;
+> = 1.000;
 
 uniform int DebugOutput < __UNIFORM_COMBO_INT1
     ui_label = "Debug Output";
@@ -87,6 +87,10 @@ float4 GetBB(float2 texcoord : TEXCOORD)
     return tex2Dlod(ReShade::BackBuffer, float4(texcoord, 0.0, 0.0));
 }
 
+float2 Rotate(float2 p, float angle) {
+	return float2(p.x * cos(angle) - p.y * sin(angle), p.x * sin(angle) + p.y * cos(angle));
+}
+
 float4 NFAA(float2 texcoord)
 {
     float SW = SearchWidth;
@@ -98,85 +102,159 @@ float4 NFAA(float2 texcoord)
         EDT = 0.005;
     }
 
-	float2 SS = SearchWidth * BUFFER_PIXEL_SIZE;
 
     // Find Edges
 	// Enhanced edge detection with linear sampling
 	//  +---+---+---+---+---+
-	//  |   |   | a | b |   |
-	//  +---+---+---x---+---+
-	//  | m | n | c | d |   |
-	//  +---x---+---+---+---+
-	//  | o | p |   | e | f |
-	//  +---+---+---+---x---+
-	//  |   | i | j | g | h |
-	//  +---+---x---+---+---+
-	//  |   | k | l |   |   |
+	//  |   |   | x | x |   |
+	//  +---+---+--(t)--+---+
+	//  | x | x | x | x |   |
+	//  +--(l)--+---+---+---+
+	//  | x | x | C | x | x |
+	//  +---+---+---+--(r)--+
+	//  |   | x | x | x | x |
+	//  +---+--(b)--+---+---+
+	//  |   | x | x |   |   |
 	//  +---+---+---+---+---+
-	float4 ts, ls, rs, bs;
-	ts = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(0.5, -SW), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-	rs = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(SW, 0.5), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-	bs = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-0.5, SW), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-	ls = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-SW, 0.5), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+	float angle = atan(0.5 / SW);
+    float4 color = GetBB(texcoord);
+	float4 ts = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(0.5, -SW), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+	float4 rs = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(SW, 0.5), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+	float4 bs = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-0.5, SW), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+	float4 ls = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-SW, 0.5), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
     
-	float t, l, r, b;
-	float2 UV = texcoord.xy;
-    t = LI(GetBB(float2(UV.x, UV.y - SS.y)).rgb);
-    b = LI(GetBB(float2(UV.x, UV.y + SS.y)).rgb);
-    l = LI(GetBB(float2(UV.x - SS.x, UV.y)).rgb);
-    r = LI(GetBB(float2(UV.x + SS.x, UV.y)).rgb);
-    float2 n = float2(t - b, r - l);
-	
 	// float t, l, r, b;
-	// t = LI(ts.rgb);
-    // b = LI(bs.rgb);
-    // l = LI(ls.rgb);
-    // r = LI(rs.rgb);
-    // float2 n = float2(t - b, r - l);
+	// float2 UV = texcoord.xy;
+	// float2 SS = SearchWidth * BUFFER_PIXEL_SIZE;
+    // t = LI(GetBB(float2(UV.x, UV.y - SS.y)).rgb);
+    // b = LI(GetBB(float2(UV.x, UV.y + SS.y)).rgb);
+    // l = LI(GetBB(float2(UV.x - SS.x, UV.y)).rgb);
+    // r = LI(GetBB(float2(UV.x + SS.x, UV.y)).rgb);
+	
+	float t = LI(ts.rgb);
+    float r = LI(rs.rgb);
+    float b = LI(bs.rgb);
+    float l = LI(ls.rgb);
+    
+	float2 n = float2(t - b, r - l);
 	float nl = length(n);
     
-	float Mask = 1.0;
-    float4 Color = GetBB(texcoord);
+	float mask = 1.0;
     if (nl >= EDT)
 	{
 		// Lets make that mask for a sharper image.
-		// Mask Formula: 1.0 - 10.0 * nl.
-		// Mask is 0 if nl >= 0.1.
-		Mask = saturate(mad(nl, -10.0, 1.0));
+		// Mask Formula: 1.0 - 5.0 * nl.
+		// Mask is 0 if nl >= 0.20.
+		mask = saturate(mad(nl, -5.0, 1.0));
 
-        SS = BUFFER_PIXEL_SIZE * n / nl;
-        if (DebugOutput == 3) SS *= 2.0; // Fake DLSS
-	
-		//  +---+---+---+---+---+
-		//  |\\\|   | a | b |   |
-		//  +---+---+---x---+---+
-		//  | m |\\\| c | d |   |
-		//  +---x---+---+---+---+
-		//  | o | p |\\\| e | f |
-		//  +---+---+---+---x---+
-		//  |   | i | j |\\\| h |
-		//  +---+---x---+---+---+
-		//  |   | k | l |   |\\\|
-		//  +---+---+---+---+---+
-        ts = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(0.7, -2.1), SS, texcoord), 0.0, 0.0)) * 0.75;
-		rs = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(2.1, 0.7), SS, texcoord), 0.0, 0.0)) * 0.9;
-		bs = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-0.7, 2.1), SS, texcoord), 0.0, 0.0)) * 0.75;
-		ls = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-2.1, -0.7), SS, texcoord), 0.0, 0.0)) * 0.9;
 
-		Color = lerp((Color + ts + rs + bs + ls) / 4.3, Color, Mask);
+		// y = -0.5*x; nx = 1; ny = 0.25; nl = 1.031; SW = 1.5; angle = 18.435 deg;
+		// m' = - 1/7
+		// +---+---+---+---+---+
+		// |   |   | 1 | 1 |   |
+		// +---+---+--(t)--+---+
+		// |\\\| 1 | 1 | 1 |   |
+		// +--(l)--+---+---+---+
+		// | 0 |\\\|\\\| 1 | 1 |
+		// +---+---+---+--(r)--+
+		// |   | 0 | 0 |\\\|\\\|
+		// +---+--(b)--+---+---+
+		// |   | 0 | 0 |   |   |
+		// +---+---+---+---+---+
+		
+		// y = 0.5*x; nx = 0.875; ny = -0.875; nl = 1.237
+		// m' = 1
+		// +---+---+---+---+---+
+		// |   |   | 1 | 1 |   |
+		// +---+---+--(t)--+---+
+		// | 1 | 1 | 1 |\\\|\\\|
+		// +--(l)--+---+---+---+
+		// | 1 |\\\|\\\| 0 | 0 |
+		// +---+---+---+--(r)--+
+		// |\\\| 0 | 0 | 0 | 0 |
+		// +---+--(b)--+---+---+
+		// |   | 0 | 0 |   |   |
+		// +---+---+---+---+---+
+
+		// y = -2x; nx = 0.875; ny = 0.875;
+		// m' = -1;
+		// +---+---+---+---+---+
+		// |   |\\\| 1 | 1 |   |
+		// +---+---+--(t)--+---+
+		// | 0 |\\\| 1 | 1 |   |
+		// +--(l)--+---+---+---+
+		// | 0 | 0 |\\\| 1 | 1 |
+		// +---+---+---+--(r)--+
+		// |   | 0 |\\\| 1 | 1 |
+		// +---+--(b)--+---+---+
+		// |   | 0 | 0 |\\\|   |
+		// +---+---+---+---+---+
+
+		// y = 2x; nx = 0.25; ny = -1.0;
+		// m' = 7;
+		// +---+---+---+---+---+
+		// |   |   | 1 |\\\|   |
+		// +---+---+--(t)--+---+
+		// | 1 | 1 | 1 |\\\|   |
+		// +--(l)--+---+---+---+
+		// | 1 | 1 |\\\| 0 | 0 |
+		// +---+---+---+--(r)--+
+		// |   | 1 |\\\| 0 | 0 |
+		// +---+--(b)--+---+---+
+		// |   |\\\| 0 |   |   |
+		// +---+---+---+---+---+
+
+		// y = -3x; nx = 0.75; ny = 0.875;
+		// m' = -4/3; 
+		// +---+---+---+---+---+
+		// |   |\\\| 1 | 1 |   |
+		// +---+---+--(t)--+---+
+		// | 0 |\\\| 1 | 1 |   |
+		// +--(l)--+---+---+---+
+		// | 0 | 0 |\\\| 1 | 1 |
+		// +---+---+---+--(r)--+
+		// |   | 0 |\\\| 1 | 1 |
+		// +---+--(b)--+---+---+
+		// |   | 0 |\\\|   |   |
+		// +---+---+---+---+---+
+
+		// estimate slope
+		float mp = (n.x != 0.0) ? -n.y / n.x : 1000.0;
+		// rotate axis and recalc slope
+		float2 p0 = Rotate(float2(1.0, mp), -angle);
+		float m = (p0.x != 0.0) ? p0.y / p0.x : 1000.0;
+
+        if (DebugOutput == 3) nl *= 2.0; // Fake DLSS
+
+		// calculate x/y coordinates on this slope at specified distance to origin
+		// parallel
+		float2 d0, d1;
+		d0.x = sqrt(1.0 / (1 + m*m));
+		d0.y = m * d0.x;
+
+		// perpendicular
+		m = -rcp(m);
+		d1.x = sqrt(0.25 / (1 + m*m));
+		d1.y = m * d1.x;
+
+        float4 t0 = tex2Dlod(ReShade::BackBuffer, float4(mad(d0, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+		float4 t1 = tex2Dlod(ReShade::BackBuffer, float4(mad(-d0, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+		float4 t2 = tex2Dlod(ReShade::BackBuffer, float4(mad(d1, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+		float4 t3 = tex2Dlod(ReShade::BackBuffer, float4(mad(-d1, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+		color = lerp((color + t0 + t1 + t2 + t3) / 5, color, mask);
     }
 
 	// DebugOutput
     if(DebugOutput == 1)
     {
-        Color.rgb = Mask;
+        color.rgb = mask;
     }
     else if (DebugOutput == 2)
     {
-        Color.rgb = float3(mad(n.yx, 0.5, 0.5), 1.0);
+        color.rgb = float3(mad(Rotate(n.yx, -angle), 0.5, 0.5), 1.0);
     }
 
-	return Color;
+	return color;
 }
 
 float4 Out(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
