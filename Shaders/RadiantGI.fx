@@ -100,6 +100,9 @@
 // Oh if you can make a 2nd Bounce almost as fast as One Bounce....... Do it with your magic you wizard.
 //
 // Write your name and changes/notes below.
+//
+// Jorban - No Repo - 07.23.2023
+// Removed the automatic binding of DEL key for the shader. Lines: 2115, 2120, and 2167
 // __________________________________________________________________________________________________________________________________________________________________________________
 // -------------------------------------------------------------------Around Line 1390---------------------------------------------------------------------------------------
 // Lord of Lunacy - https://github.com/LordOfLunacy
@@ -1585,8 +1588,8 @@ void CBReconstruction(float4 vpos : SV_Position, float2 texcoords : TEXCOORD, ou
 
 float3 GI(float2 TC, float Mips)
 {
-	#line 4 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info ¿"
-	#warning " ÂT ÂA ÂM ÂP ÂE ÂR ÂE ÂD "
+	#line 4 "For the latest version go https://blueskydefender.github.io/AstrayFX/ or http://www.Depth3D.info ï¿½"
+	#warning " ï¿½T ï¿½A ï¿½M ï¿½P ï¿½E ï¿½R ï¿½E ï¿½D "
 	float3 GI_Out = tex2Dlod( PCGIReconstruction_Info, float4( TC * GI_Res , 0, Mips)).xyz ;
 	return GetPos() ? GI_Out * TC.xyx : GI_Out;
 }   float  Helper() { float Temp_Location = T_01() == 12500 ? 0 : 1 ; return Temp_Location;}
@@ -2110,11 +2113,11 @@ void PostProcessVS(in uint id : SV_VertexID, out float4 position : SV_Position, 
 //*Rendering passes*//
 #if Simp_Mode
 technique PCGI_One
-< toggle = 0x2E; ui_label = "RadiantGI";
+<ui_label = "RadiantGI";
 ui_tooltip = "RadiantGI: Point Cloud Global Illumination."; >
 #else
 technique PCGI_One
-< toggle = 0x2E; ui_label = "PCGIÂ¹";
+<ui_label = "PCGIÂ¹";
 ui_tooltip = "Alpha: Global Illumination Primary Generator.Â¹"; >
 #endif
 {
@@ -2161,7 +2164,7 @@ ui_tooltip = "Alpha: Global Illumination Primary Generator.Â¹"; >
 }
 
 technique PCGI_Two
-< toggle = 0x2E; ui_label = "PCGIÂ²";
+<ui_label = "PCGIÂ²";
 ui_tooltip = "Beta: Global Illumination Secondary Output.Â²"; >
 {
 
