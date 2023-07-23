@@ -51,22 +51,24 @@ uniform int EdgeDetectionType < __UNIFORM_COMBO_INT1
 uniform float EdgeDetectionThreshold < __UNIFORM_DRAG_FLOAT1
 	ui_label = "Edge Detection Threshold";
     ui_tooltip = "If NFAA misses some edges try lowering this slightly.\n"
-				 "Default is 0.050";
+				 "Default is 0.100";
     ui_min = 0.000; ui_max = 0.200;
-> = 0.050;
+> = 0.100;
 
 uniform float SearchWidth < __UNIFORM_DRAG_FLOAT1
     ui_label = "Search Radius";
     ui_tooltip = "The radius to search for edges.\n"
+				 "Try lowering this if short edges are not blurred.\n"
 				 "Try raising this if using in-game upscaling.\n"
                  "Default is 1.000";
-    ui_min = 0.000; ui_max = 4.000;
+    ui_min = 0.500; ui_max = 4.000;
 > = 1.000;
 
 uniform float BlurStrength < __UNIFORM_DRAG_FLOAT1
     ui_label = "Blur Strength";
     ui_tooltip = "Darkens Edge Mask for filtering edge blur strength.\n"
-				"Try raising this if edges are still too aliased.\n"
+				 "Try raising this if edges are still too aliased.\n"
+				 "Try lowering this if text or icons become blurry.\n"
                  "Default is 1.000";
     ui_min = 0.000; ui_max = 2.000;
 > = 1.000;
@@ -74,6 +76,7 @@ uniform float BlurStrength < __UNIFORM_DRAG_FLOAT1
 uniform float BlurSize < __UNIFORM_DRAG_FLOAT1
     ui_label = "Blur Size";
     ui_tooltip = "Sets Normal Map depth for larger edge blur length.\n"
+				 "Try raising this if edges are still too aliased.\n"
 				 "Try lowering this if text or icons become blurry.\n"
                  "Default is 1.000";
     ui_min = 0.000; ui_max = 2.000;
@@ -82,21 +85,23 @@ uniform float BlurSize < __UNIFORM_DRAG_FLOAT1
 uniform int DebugOutput < __UNIFORM_COMBO_INT1
     ui_label = "Debug Output";
     ui_items = "None\0Edge Mask View\0Normal Map View\0";
-    ui_tooltip = "Edge Mask View gives you a view of the edge detection.\n"
-                 "Normal Map View gives you an view of the normals created.";
+    ui_tooltip = "Edge Mask View gives you a view of the Edge Detection and Blur Strength.\n"
+                 "Normal Map View gives you a view of the Normal Map creation, Blur Size, and Blur Direction.";
 > = 0;
 
-//Total amount of frames since the game started.
-uniform uint framecount < source = "framecount"; >;
+////////////////////////////////////////////////////////////Variables////////////////////////////////////////////////////////////////////
 
-////////////////////////////////////////////////////////////NFAA////////////////////////////////////////////////////////////////////
+// sRGB Luminance
+static const float3 LinearizeVector[4] = { float3(0.2126, 0.7152, 0.0722), float3(0.299, 0.587, 0.114), float3(1.0, 1.0, 1.0), float3(0.508, 1.0, 0.195) };
+
+static const float cos45 = 0.70710678118654752440084436210485;
+
+////////////////////////////////////////////////////////////Functions////////////////////////////////////////////////////////////////////
+
 float signF(float n) {
 	// sign intrinsic can return 0, which we don't want.
 	return n < 0.0 ? -1.0 : 1.0;
 }
-
-// sRGB Luminance
-static const float3 LinearizeVector[4] = { float3(0.2126, 0.7152, 0.0722), float3(0.299, 0.587, 0.114), float3(1.0, 1.0, 1.0), float3(0.299, 0.587, 0.114) };
 
 float LinearDifference(float3 A, float3 B)
 {
@@ -104,60 +109,45 @@ float LinearDifference(float3 A, float3 B)
 	if (EdgeDetectionType < 2)
     	return lumDiff;
 	
+	// color detection is a bit more expensive, so luminance is default
 	else if (EdgeDetectionType == 2)
 	{
 		float3 C = abs(A - B);
 		return max(max(C.r, C.g), C.b) * signF(lumDiff);
 	}
-	
-	else // if (EdgeDetectionType == 3)
-		return dot(abs(A - B), LinearizeVector[EdgeDetectionType]) * signF(lumDiff);
+	else { // if (EdgeDetectionType == 3)
+		float3 C = abs(A - B) * LinearizeVector[EdgeDetectionType];
+		return max(max(C.r, C.g), C.b) * signF(lumDiff);
+	}
 }
 
-float2 Rotate(float2 p, float angle) {
-	return float2(p.x * cos(angle) - p.y * sin(angle), p.x * sin(angle) + p.y * cos(angle));
+float2 Rotate45(float2 p) {
+	return float2(p.x * cos45 - p.y * cos45, p.x * cos45 + p.y * cos45);
 }
 
-float4 NFAA(float2 texcoord)
+////////////////////////////////////////////////////////////NFAA////////////////////////////////////////////////////////////////////
+
+float4 NFAA(float2 texcoord, float4 offsets[4])
 {
-    // Find Edges
-
-	// linear sampling for improved edge detection - worse at detecting jagged edges
-	//  +---+---+---+---+---+
-	//  |   |   | x | x |   |
-	//  +---+---+--(t)--+---+
-	//  | x | x | x | x |   |
-	//  +--(l)--+---+---+---+
-	//  | x | x | C | x | x |
-	//  +---+---+---+--(r)--+
-	//  |   | x | x | x | x |
-	//  +---+--(b)--+---+---+
-	//  |   | x | x |   |   |
-	//  +---+---+---+---+---+
-	// float angle = atan(0.5 / SearchWidth);
-	// float3 t = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(0.5, -SearchWidth), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0)).rgb;
-	// float3 b = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-0.5, SearchWidth), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0)).rgb;
-	// float3 r = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(SearchWidth, 0.5), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0)).rgb;
-	// float3 l = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-SearchWidth, -0.5), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0)).rgb;
-
+	// Find Edges
 	//  +---+---+---+---+---+
 	//  |   |   |   |   |   |
 	//  +---+---+---+---+---+
-	//  |   | x | x | x |   |
-	//  +---+---l---t---+---+
-	//  |   | x | C | x |   |
-	//  +---+---b---r---+---+
-	//  |   | x | x | x |   |
+	//  |   | e | f | g |   |
+	//  +---+--(a)-(b)--+---+
+	//  |   | h | P | i |   |
+	//  +---+--(c)-(d)--+---+
+	//  |   | j | k | l |   |
 	//  +---+---+---+---+---+
 	//  |   |   |   |   |   |
 	//  +---+---+---+---+---+
-	float angle = 0.0; //radians(45.0);
-	float2 SW = 0.5 * SearchWidth * BUFFER_PIXEL_SIZE;
-	float3 t = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(1.0, -1.0), SW, texcoord), 0.0, 0.0)).rgb;
-	float3 b = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-1.0, 1.0), SW, texcoord), 0.0, 0.0)).rgb;
-	float3 r = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(1.0, 1.0), SW, texcoord), 0.0, 0.0)).rgb;
-	float3 l = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-1.0, -1.0), SW, texcoord), 0.0, 0.0)).rgb;
+	// Much better at horizontal/vertical lines, slightly better diagonals, always compares 6 pixels, not 2.
+	float3 a = tex2Dlod(ReShade::BackBuffer, offsets[0]).rgb;
+	float3 b = tex2Dlod(ReShade::BackBuffer, offsets[1]).rgb;
+	float3 c = tex2Dlod(ReShade::BackBuffer, offsets[2]).rgb;
+	float3 d = tex2Dlod(ReShade::BackBuffer, offsets[3]).rgb;
 
+	// Original edge detection from b34r & BlueSkyDefender
 	//  +---+---+---+---+---+
 	//  |   |   |   |   |   |
 	//  +---+---+---+---+---+
@@ -174,121 +164,106 @@ float4 NFAA(float2 texcoord)
 	// float3 b = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-0.0, SearchWidth), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0)).rgb;
 	// float3 r = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(SearchWidth, 0.0), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0)).rgb;
 	// float3 l = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-SearchWidth, 0.0), BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0)).rgb;
-	
-	// we can skip this tap by averaging diagonal taps and using discard and alpha channel blending
-	// float4 color = float4((t + b + r + l) / 4.0, 1.0);
+
 	float4 color = tex2Dlod(ReShade::BackBuffer, float4(texcoord, 0.0, 0.0));
 	
 	// Normal Depth
 	// float2 n = float2(LinearDifference(t, b), LinearDifference(r, l));
-	float3 tn = t + l - color.rgb * max(2 - SearchWidth, 0);
-	float3 bn = b + r - color.rgb * max(2 - SearchWidth, 0);
-	float3 rn = r + t - color.rgb * max(2 - SearchWidth, 0);
-	float3 ln = l + b - color.rgb * max(2 - SearchWidth, 0);
-	float2 n = float2(LinearDifference(tn, bn), LinearDifference(rn, ln));
-	float nl = length(n);
+
+	// top vs bottom = 	a + b - c - d = 	(e + 2*f + g) / 4 - (j + 2*k + l) / 4
+	// TL vs BR = 		4/3 * (a - d) = 	(h + e + f) / 3 - (k + l + i) / 3
+	float4 n;
+	n.x = LinearDifference(b + d, a + c); // right - left
+	n.y = LinearDifference(c + d, a + b); // bottom - top
+	n.z = 1.3333333 * LinearDifference(d, a); // bottom-right - top-left
+	n.w = 1.3333333 * LinearDifference(c, b); // bottom-left - top-right
     
-	float edgeMask = 1.0;
+	float2 nLength = float2(length(n.xy), length(n.zw));
+	
 	float3 normalMap = float3(0.5, 0.5, 1.0);
-    if (nl >= EdgeDetectionThreshold)
+	float edgeMask = 1.0;
+
+	float2 normal;
+	float edge;
+	if (nLength.y > nLength.x) {
+		normal = Rotate45(n.zw);
+		edge = nLength.y;
+	}
+	else {
+		normal = n.xy;
+		edge = nLength.x;
+	}
+
+    if (edge >= EdgeDetectionThreshold)
 	{
 		// Lets make that edgeMask for a sharper image.
-		// Mask Formula: 1.0 - BlurStrength * nl.
-		edgeMask = saturate(mad(nl, -10.0 * BlurStrength, 1.0));
-		// normalMap.rg = mad(-n.yx * BlurSize, 0.5, 0.5);
-		normalMap.rg = mad(Rotate(-n.yx, -angle) * BlurSize, 0.5, 0.5);
+		// Mask Formula: 1.0 - 5.0 * edge.
+		edgeMask = saturate(mad(edge, -5.0 * BlurStrength, 1.0));
+		// Normal map, right = red, green = top
+		normalMap.rg = mad(float2(-normal.r, normal.g) * BlurSize, 0.5, 0.5);
 
-		// // estimate slope on rotated coordinates
-		// float mp = (n.x != 0.0) ? -n.y / n.x : 1000.0;
-		// // rotate axis and recalc slope relative to the new coordinate system
-		// float2 p0 = Rotate(float2(1.0, mp), -angle);
-		// float m = (p0.x != 0.0) ? p0.y / p0.x : 1000.0;
+		// calculate x/y coordinates on the line at specified distances and offsets
+		// +---+---+---+---+---+ +---+---+---+---+---+
+		// |   |   |   |   |   | |   |   |   |   |   |
+		// +---+---+---+---+---+ +---+---+---+---+---+
+		// |   |   |   |   |   | |   |   | (e)   |   |
+		// +---+(g)a---b(e)+---+ +---+---a---b(f)+---+
+		// |   |-O | P | O |   | |   |   | P |   |   |
+		// +---+(h)c---d(f)+---+ +---+(g)c---d---+---+
+		// |   |   |   |   |   | |   |   (h) |   |   |
+		// +---+---+---+---+---+ +---+---+---+---+---+
+		// |   |   |   |   |   | |   |   |   |   |   |
+		// +---+---+---+---+---+ +---+---+---+---+---+
 
+		// slope m = normal.r / normal.g
+		// distance d = 1
+		// y = mx
+		// d^2 = y^2 + x^2 = (mx)^2+x^2
+		// d^2 = x^2(1 + m^2)
+		// x^2 = d^2/(1 + m^2)
 
-		// calculate x/y coordinates on this slope at specified distance
-		// +---+---+---+---+---+
-		// |   |   |   |   |   |
-		// +---+---+---+---+---+
-		// |   |   |   |(1)|   |
-		// +---+---+---+---+---+
-		// |\\\|-d |\\\|(0)|\\\|
-		// +---+---+---+---+---+
-		// |   |   |   |(2)|   |
-		// +---+---+---+---+---+
-		// |   |   |   |   |   |
-		// +---+---+---+---+---+
-		
-		// float m = (n.x != 0.0) ? -n.y / n.x : 1000.0;
-		// float d = dot(n, float2(signF(n.x), signF(n.y))) / nl * 0.5 * BlurSize;
-		// float2 d0, d1, d2;
-		// d0.x = sqrt(d*d / (1 + m*m));
-		// d0.y = m * d0.x;
+		float4 offset;
+		float m = normal.g != 0 ? normal.r / normal.g : 1024.0;
+		offset.x = sqrt(BlurSize * BlurSize / (1.0 + m * m));
+		offset.y = m * offset.x;
+		m = normal.r != 0 ? -normal.g / normal.r : 1024.0;
+		offset.z = sqrt(0.25 * BlurSize * BlurSize / (1.0 + m * m));
+		offset.w = m * offset.z;
 
-		// d *= 2.0;
-		// m = -m;
-		// d1.x = sqrt(d*d / (1 + m*m));
-		// d1.y = m * d1.x;
+        float3 e = tex2Dlod(ReShade::BackBuffer, float4(mad(offset.xy + offset.zw, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0)).rgb;
+        float3 f = tex2Dlod(ReShade::BackBuffer, float4(mad(offset.xy - offset.zw, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0)).rgb;
+        float3 g = tex2Dlod(ReShade::BackBuffer, float4(mad(-offset.xy + offset.zw, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0)).rgb;
+		float3 h = tex2Dlod(ReShade::BackBuffer, float4(mad(-offset.xy - offset.zw, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0)).rgb;
 
-		// m = -rcp(m);
-		// d2.x = sqrt(d*d / (1 + m*m));
-		// d2.y = m * d2.x;
+		// possible to reduce taps by re-using edge detection taps a, b, c, d
+		// but its not worth it, nearby pixels should already be cached, and needs more math
 
-        // float4 t0 = tex2Dlod(ReShade::BackBuffer, float4(mad(d0, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		// float4 t1 = tex2Dlod(ReShade::BackBuffer, float4(mad(-d0, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		// float4 t2 = tex2Dlod(ReShade::BackBuffer, float4(mad(d1, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		// float4 t3 = tex2Dlod(ReShade::BackBuffer, float4(mad(-d1, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		// float4 t4 = tex2Dlod(ReShade::BackBuffer, float4(mad(d2, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		// float4 t5 = tex2Dlod(ReShade::BackBuffer, float4(mad(-d2, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		// color = lerp(mad(color, 0.2222222, mad(t0 + t1, 0.1666667, 0.1111111 * (t2 + t3 + t4 + t5))), color, edgeMask);
-		
-		// +---+---+---+---+---+
-		// |   |   |   |   |   |
-		// +---+---+---+---+---+
-		// |\\\| 1 | 1 | 1 |   |
-		// +---+---l---t---+---+
-		// |   |\\\|\\\| 1 |   |
-		// +---+---b---r---+---+
-		// |   | 0 | 0 |\\\|\\\|
-		// +---+---+---+---+---+
-		// |   |   |   |   |   |
-		// +---+---+---+---+---+
-		// float2 dn = Rotate(n, -angle) / nl * BlurSize;
-		// y = -0.5x; n.x = 2.5/6; n.y = 1/6; nl = 0.4487; dn.x = 0.928; dn.y = 0.371;
-		// t0/1 = 0.464, 0.186;
-		// t2/3 = 0.835, -0.34;
-		// we can reuse initial taps
-		// t0x = 
-		
+		color.rgb = lerp(mad(e + f + g + h, 0.125 * BlurStrength, color.rgb * 0.5 * (2.0 - BlurStrength)), color.rgb, edgeMask);
 
 		// original blur from b34r & BlueSkyDefender
+		// may need some work to be functional again due to some variable name refactoring I reversed how/why it worked - Eric B.
 		// +---+---+---+---+---+
 		// |   |   |   |   |   |
 		// +---+---+---+---+---+
-		// |\\\|   | 1 |   |   |
+		// |\\\|   | x | x |   |
 		// +---+---+---+---+---+
-		// |   |\\\|\\\| 1 |   |
+		// |   |\\\|\\\| x |   |
 		// +---+---+---+---+---+
-		// |   |   | 0 |\\\|\\\|
+		// |   |   | x |\\\|\\\|
 		// +---+---+---+---+---+
 		// |   |   |   |   |   |
 		// +---+---+---+---+---+
 		// y = -0.5x; n.x = 1; n.y = 0.5; nl = 1.18; dn.x = 0.85; dn.y = 0.42;
 		// t0/1 = 0.425, 0.21; d ~= 0.5
 		// t2/3 = 0.765, -0.38; d ~= 0.85
-		float2 dn = Rotate(n, -angle) / nl * BlurSize;
 		// float2 dn = n / nl * BlurSize;
-		float4 t0 = tex2Dlod(ReShade::BackBuffer, float4(mad(-dn * 0.5, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		float4 t1 = tex2Dlod(ReShade::BackBuffer, float4(mad(dn * 0.5, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		float4 t2 = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(dn.x, -dn.y) * 0.9, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		float4 t3 = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-dn.x, dn.y) * 0.9, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		float4 t4 = tex2Dlod(ReShade::BackBuffer, float4(mad(-dn.yx * 0.9, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		float4 t5 = tex2Dlod(ReShade::BackBuffer, float4(mad(dn.yx * 0.9, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
-		color = lerp(mad(color, 0.23, 0.0875 * (t2 + t3 + t4 + t5) + 0.21 * (t0 + t1)), color, edgeMask);
-
-		// color.rgb = lerp((t + b + r + l) / 4.0, color.rgb, edgeMask);
+		// float4 t0 = tex2Dlod(ReShade::BackBuffer, float4(mad(-dn * 0.5, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+		// float4 t1 = tex2Dlod(ReShade::BackBuffer, float4(mad(dn * 0.5, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+		// float4 t2 = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(dn.x, -dn.y) * 0.9, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+		// float4 t3 = tex2Dlod(ReShade::BackBuffer, float4(mad(float2(-dn.x, dn.y) * 0.9, BUFFER_PIXEL_SIZE, texcoord), 0.0, 0.0));
+		// color = lerp(mad(color, 0.23, 0.175 * (t2 + t3) + 0.21 * (t0 + t1)), color, edgeMask);
     }
 
-	// DebugOutput
     if(DebugOutput == 1)
     {
         color.rgb = edgeMask;
@@ -301,16 +276,25 @@ float4 NFAA(float2 texcoord)
 	return color;
 }
 
-float4 NFAA_PS(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
+void NFAA_VS(in uint id : SV_VertexID, out float4 position : SV_POSITION, out float2 texcoord : TEXCOORD, out float4 offsets[4] : OFFSETS )
 {
-	return NFAA(texcoord);
+    PostProcessVS(id, position, texcoord);
+	offsets[0] = float4(mad(float2(-1.0, -1.0) * BUFFER_PIXEL_SIZE, SearchWidth, texcoord), 0.0, 0.0);
+	offsets[1] = float4(mad(float2(1.0, -1.0) * BUFFER_PIXEL_SIZE, SearchWidth, texcoord), 0.0, 0.0);
+	offsets[2] = float4(mad(float2(-1.0, 1.0) * BUFFER_PIXEL_SIZE, SearchWidth, texcoord), 0.0, 0.0);
+	offsets[3] = float4(mad(float2(1.0, 1.0) * BUFFER_PIXEL_SIZE, SearchWidth, texcoord), 0.0, 0.0);
+}
+
+float4 NFAA_PS(in float4 position : SV_Position, in float2 texcoord : TEXCOORD, in float4 offsets[4] : OFFSETS) : SV_Target
+{
+	return NFAA(texcoord, offsets);
 }
 
 technique NFAA
 {
 		pass NFAA_Fast
         {
-            VertexShader = PostProcessVS;
+            VertexShader = NFAA_VS;
             PixelShader = NFAA_PS;
         }
 }
