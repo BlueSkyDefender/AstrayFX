@@ -93,7 +93,7 @@
 // I welcome almost any help that seems to improve the code. But, The changes need to be approved by myself. So feel free to submit changes to me personally.
 // Things to work on are listed here. Oh if you feel your code changes too much. Just add a preprocessor to section off your code. Thank you.
 //
-// Write your name and changes/notes below.
+// Write your name and changes/notes below thank you.
 // __________________________________________________________________________________________________________________________________________________________________________________
 // -------------------------------------------------------------------Around Line 1390---------------------------------------------------------------------------------------
 // Lord of Lunacy - https://github.com/LordOfLunacy
