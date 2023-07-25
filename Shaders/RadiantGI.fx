@@ -3,7 +3,7 @@
 //-------------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 3.0+ PCGI Ver 3.0.8
+//For Reshade 3.0+ PCGI Ver 3.0.9
 //-----------------------------
 //                                                                Radiant Global Illumination
 //                                                                              +
@@ -90,14 +90,8 @@
 //
 // Notes to the other developers: https://github.com/BlueSkyDefender/AstrayFX
 //
-// I welcome almost any help that seems to improve the code. But, The changes need to be approved by myself. So feel free to submit changes here on github.
+// I welcome almost any help that seems to improve the code. But, The changes need to be approved by myself. So feel free to submit changes to me personally.
 // Things to work on are listed here. Oh if you feel your code changes too much. Just add a preprocessor to section off your code. Thank you.
-//
-// Better TAA if you know how to do this better change it.Frame-to-frame coherence Is fast enough in my eyes now. but, I know other devs can do better.
-// Much sparser sampling is need to hide low poly issues so we need better Smooth Normals code, Bent Normal maps ect.
-// Better specular reflections.......... ect.
-//
-// Oh if you can make a 2nd Bounce almost as fast as One Bounce....... Do it with your magic you wizard.
 //
 // Write your name and changes/notes below.
 // __________________________________________________________________________________________________________________________________________________________________________________
@@ -2110,11 +2104,11 @@ void PostProcessVS(in uint id : SV_VertexID, out float4 position : SV_Position, 
 //*Rendering passes*//
 #if Simp_Mode
 technique PCGI_One
-< toggle = 0x2E; ui_label = "RadiantGI";
+< togglectrl = true; toggle = 0x2E; ui_label = "RadiantGI";
 ui_tooltip = "RadiantGI: Point Cloud Global Illumination."; >
 #else
 technique PCGI_One
-< toggle = 0x2E; ui_label = "PCGI¹";
+< togglectrl = true; toggle = 0x2E; ui_label = "PCGI¹";
 ui_tooltip = "Alpha: Global Illumination Primary Generator.¹"; >
 #endif
 {
@@ -2161,7 +2155,7 @@ ui_tooltip = "Alpha: Global Illumination Primary Generator.¹"; >
 }
 
 technique PCGI_Two
-< toggle = 0x2E; ui_label = "PCGI²";
+< togglectrl = true; toggle = 0x2E; ui_label = "PCGI²";
 ui_tooltip = "Beta: Global Illumination Secondary Output.²"; >
 {
 
@@ -2349,5 +2343,12 @@ ui_tooltip = "Beta: Global Illumination Secondary Output.²"; >
 // Update 3.0.8
 //
 // Set the default for Trim to off and adjusted a few things. Changed the UI a little bit to make it easier on new users.
+//
+// Update 3.0.9
+//
+// To be honest, this update was made under duress. I was not ready to make this update, nor did I want to do it so soon. I was not asked to do this; it was demanded of me. I had intended to 
+// wait for a proper update for this shader, addressing all my own users requests. I apologize if I got your hopes up by making promises about the next update. This update is not a happy one, 
+// and if it brings you joy, I must express my disapproval. I know your going justify it to yourself and cope. But, in the grand scheme of things, this issue was minor, and it boggles the mind 
+// that a few people hyper-focused on it. All of It is rather petty. Despite demands to remove the key, I have only added a modifier. Until a proper solution is devised, I'll refrain from updates.
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
