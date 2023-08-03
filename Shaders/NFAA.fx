@@ -329,20 +329,20 @@ float4 NFAA(float2 texcoord, float4 offsets[4])
     return color;
 }
 
-void NFAA_VS(in uint id : SV_VertexID, out float4 position : SV_POSITION, out float2 texcoord : TEXCOORD, out float4 offsets[4] : OFFSETS )
+void NFAA_VS(in uint id : SV_VertexID, out float4 position : SV_POSITION, out float2 texcoord : TEXCOORD, out float4 offsets[4] : TEXCOORD1 )
 {
 	texcoord.x = (id == 2) ? 2.0 : 0.0;
 	texcoord.y = (id == 1) ? 2.0 : 0.0;
 	position = float4(texcoord * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 1.0);
     
-	float2 offset =  Cos45 * EdgeSearchRadius * BUFFER_PIXEL_SIZE;
+	float2 offset = Cos45 * EdgeSearchRadius * BUFFER_PIXEL_SIZE;
     offsets[0] = float4(mad(float2(-1.0, -1.0), offset, texcoord), 0.0, 0.0);
     offsets[1] = float4(mad(float2(1.0, -1.0),  offset, texcoord), 0.0, 0.0);
     offsets[2] = float4(mad(float2(-1.0, 1.0), offset, texcoord), 0.0, 0.0);
     offsets[3] = float4(mad(float2(1.0, 1.0), offset, texcoord), 0.0, 0.0);
 }
 
-float4 NFAA_PS(in float4 position : SV_Position, in float2 texcoord : TEXCOORD, in float4 offsets[4] : OFFSETS) : SV_Target
+float4 NFAA_PS(in float4 position : SV_Position, in float2 texcoord : TEXCOORD, in float4 offsets[4] : TEXCOORD1) : SV_Target
 {
     return NFAA(texcoord, offsets);
 }
