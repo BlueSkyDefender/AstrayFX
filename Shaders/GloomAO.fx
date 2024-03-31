@@ -703,7 +703,7 @@ float Depth_Info(float2 texcoord)
 	if( Easy_SS_Scaling == 1 )
 		SS_Scaling = 1.5;	
 	if( Easy_SS_Scaling == 2 )
-		SS_Scaling = 1.72;	
+		SS_Scaling = 1.73;	
 	if( Easy_SS_Scaling == 3 )
 		SS_Scaling = 2.0;
 	if( Easy_SS_Scaling == 4 )
