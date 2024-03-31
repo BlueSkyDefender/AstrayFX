@@ -3,7 +3,7 @@
 //-----------////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                               																									*//
-//For Reshade 4.0+ SSDO Ver 0.2.7
+//For Reshade 4.0+ SSDO Ver 0.2.9
 //-----------------------------
 //                                                                Screen Space Directional Occlusion
 //
@@ -103,14 +103,13 @@
 #endif
 
 //Depth Buffer Adjustments
-#define DB_Size_Position 0     //[Off | On]         This is used to reposition and adjust the size of the depth buffer.
+#define DB_Size_Position 1    //[Off | On]         This is used to reposition and adjust the size of the depth buffer.
 #define BD_Correction 0        //[Off | On]         Barrel Distortion Correction for non conforming BackBuffer.
 
 //Other Settings
 #define Text_Info_Key 93       //Menu Key            Text Information Key Default 93 is the Menu Key. You can use this site https://keycode.info to pick your own.
 #define Disable_Debug_Info 0   //[Off | On]          Use this to disable help information that gives you hints for fixing many games with Overwatch.fxh.
 #define Minimize_Web_Info 0    //[Off | On]          Use this to minimize the website logo on startup.
-#define Force_Texture_Details 0//[Off | On]          This is used to add Texture Detail AO into SSDO output. WIP
 #define SSDO_Buffer_Size 2     //   [1-2]            You can use this to set the resolution of the main SSDO Buffer.
 
 //Help / Guide Information stub uniform a idea from LucasM
@@ -154,18 +153,17 @@ uniform float SSDO_SampleRadius <
 				 "Setting this too high will decrease performance.";//High values reduce cache coherence, This will lead to cache misses and decrease performance.
 	ui_category = "SSDO";
 > = 2500.0;
-#if Force_Texture_Details
-uniform float SSDO_2DTexture_Detail <
+
+uniform float2 Set_2DTexture_Detail <
 	ui_type = "slider";
 	ui_min = 0.0; ui_max = 1.0;
-	ui_label = "Texture Details";
-	ui_tooltip = "Lets you add Texture Details to SSDO so you can have Obscurance on 2D information.\n"
-			     "Defaults is [0.0] Off";
-	ui_category = "SSDO";
-> = 0.0;
-#else
-static const int SSDO_2DTexture_Detail = 0;
-#endif
+	ui_label = "Texture Details & Falloff";
+	ui_tooltip = "Lets you add Texture Details to PCGI so you can have added 2D texture information applyed to the GI.\n"
+				 "Turn this on by adjusting the first slider and then adjusting it's falloff with the second.\n"
+			     "Defaults are [0.0,0.5] and Zero is Off";
+	ui_category = "Supplemental Contributions";
+> = float2(0.0,1.0);
+
 uniform float2 NCD <
 	ui_type = "slider";
 	ui_min = 0.0; ui_max = 1.0;
@@ -340,6 +338,15 @@ uniform float2 Image_Position_Adjust<
 	ui_tooltip = "Adjust the Image Position if it's off by a bit. Default is Zero.";
 	ui_category = "Depth Corrections";
 > = float2(DD_Z,DD_W);
+
+uniform int Easy_SS_Scaling <
+	ui_type = "combo";
+	ui_items = "Off\0DLSS Quality\0DLSS Balanced\0DLSS Performance\0DLSS Ultra Performance\0";
+	ui_label = "Super Sampling Scaling";
+	ui_tooltip = "Use Adjust the Depth to match the main screen.\n"
+				 "Default is ON.";
+	ui_category = "Depth Corrections";
+> = 0;
 #else
 static const float2 Horizontal_and_Vertical = float2(DD_X,DD_Y);
 static const float2 Image_Position_Adjust = float2(DD_Z,DD_W);
@@ -691,7 +698,19 @@ float Depth_Info(float2 texcoord)
 
 	if (Depth_Map_Flip)
 		texcoord.y =  1 - texcoord.y;
-
+	float SS_Scaling = 1;
+	
+	if( Easy_SS_Scaling == 1 )
+		SS_Scaling = 1.5;	
+	if( Easy_SS_Scaling == 2 )
+		SS_Scaling = 1.72;	
+	if( Easy_SS_Scaling == 3 )
+		SS_Scaling = 2.0;
+	if( Easy_SS_Scaling == 4 )
+		SS_Scaling = 3.0;			
+	
+	texcoord.xy /= SS_Scaling; 
+	
 	//Conversions to linear space.....
 	float zBuffer = tex2Dlod(ZBufferSSDO, float4(texcoord,0,0)).x, zBufferWH = zBuffer, Far = 1.0, Near = 0.125/(0.00000001+Depth_Map_Adjust), NearWH = 0.125/(Depth_Map ? NCD.y : 10*NCD.y), OtherSettings = Depth_Map ? NCD.y : 100 * NCD.y ; //Near & Far Adjustment
 	//Man Why can't depth buffers Just Be Normal
@@ -716,13 +735,13 @@ float Depth_Info(float2 texcoord)
 
 	return  saturate( lerp(NCD.y > 0 ? zBufferWH : zBuffer,zBuffer,0.925) );
 }  int T_02() { return 25000; }
-#if Force_Texture_Details
+
 void SSDOColors(float4 vpos : SV_Position, float2 texcoords : TEXCOORD,
 						out float4 Colors : SV_Target0)
 {	   float Intensity = 1-dot(0.333,tex2Dlod(BackBufferSSDO,float4(texcoords,0,0)).xyz) > lerp(0.0,0.5,SSDO_Intensity_Masking);
 		Colors = float4(tex2D(BackBufferSSDO,texcoords).rgb, Intensity);
 }
-#endif
+
 float2 PackNormals(float3 n)
 {
     float f = rsqrt(8*n.z+8);
@@ -731,7 +750,7 @@ float2 PackNormals(float3 n)
 
 float SUMTexture_lookup(float2 TC, float dx, float dy)
 {   float Depth = 1-Depth_Info( TC );
-		  Depth = (Depth - 0)/ (lerp(1,10,saturate(1-SSDO_2DTexture_Detail)) - 0);
+		  Depth = (Depth - 0)/ (lerp(1,10,saturate(1-Set_2DTexture_Detail.x)) - 0);
     float2 uv = (TC.xy + float2(dx , dy ) * pix);
     float3 c = tex2Dlod( SamplerColorsSSDO, float4(uv.xy,0, 0) ).rgb * 0.5;
     //c = smoothstep(0,1,normalize(c));
@@ -741,7 +760,7 @@ float SUMTexture_lookup(float2 TC, float dx, float dy)
 
 float3 TextureNormals(float2 UV, float Depth)
 {
-	if(saturate(SSDO_2DTexture_Detail) > 0)
+	if(saturate(Set_2DTexture_Detail.x) > 0)
 	{
 		// simple sobel edge detection
 	    float dx = 0.0;
@@ -769,27 +788,17 @@ float3 TextureNormals(float2 UV, float Depth)
 		float Y = edge * sin(angle + 7.5 * PI / 3.);// Adjust me to rotate Normals
 		float Z = edge * (X - Y);
 
-		return min(1,lerp(float3(X,Y,Z) * Depth, 0, float3(X,Y,Z) == 0.5));
+		return min(1,lerp(float3(X,Y,Z) * lerp(1,Depth,Set_2DTexture_Detail.y), 0, float3(X,Y,Z) == 0.5));
 	}
 	else
 		return 0;
 
 }
 
-//PureDepthAO
-#if Force_Texture_Details
 void NormalsDepth(float4 vpos : SV_Position, float2 texcoords : TEXCOORD,
 						out float2 Normals : SV_Target0,
 						out float Depth : SV_Target1)
 {
-#else
-void NormalsColorsDepth(float4 vpos : SV_Position, float2 texcoords : TEXCOORD,
-						out float2 Normals : SV_Target0,
-						out float4 Colors : SV_Target1,
-						out float Depth : SV_Target2)
-{
-#endif
-    // WTF right well I got tired of working on this so I just half assed it.
 	float2 off1 = float2( pix.x, 0); // right
 	float2 off4 = float2( 0,-pix.y); // up
 	//A 2x2 Taps is done here. You can also do 4x4 tap
@@ -845,10 +854,6 @@ void NormalsColorsDepth(float4 vpos : SV_Position, float2 texcoords : TEXCOORD,
 	 Enormal = lerp( normal + TextureNormals(texcoords, depth), Enormal,  distance( normalize(normal), normalize(Enormal) ) >= 0.7f );
 
 	Normals = PackNormals(normalize(Enormal));
-	#if !Force_Texture_Details
-	float Intensity = 1-dot(0.333,tex2Dlod(BackBufferSSDO,float4(texcoords,0,0)).xyz) > lerp(0.0,0.5,SSDO_Intensity_Masking);
-	Colors = float4(tex2D(BackBufferSSDO,texcoords).rgb, Intensity);
-	#endif
 	Depth = depth;
 }
 
@@ -900,6 +905,8 @@ float4 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 
 		if(Normals_Depth.w > SSDO_Max_Depth)
 			continue;
+		if( 1-tex2Dlod(SamplerColorsSSDO,float4(texcoords,0,2.0)).w)	
+			continue;
 		//Dumb Magic combo Noise.... Ended up liking this for some damn reason. ////normalize(frac(float2(IGN*BUFFER_WIDTH,IGN*BUFFER_HEIGHT)*i)*2.0-1.0)
 		float2 RayDir  = (pix * (SSDO_SRM/SSDO_Samples)) * IGN * Rotate2D( POISSON_SAMPLES[i], IGN ) / D0; // tossed out reflect(coord,random) Because Sampled Mips didn't work with the code above.... May need Yakube to fix this.
 			   RayDir *= sign(dot(normalize(float3(RayDir.x,-RayDir.y,1.0)),Normals_Depth.xyz)); // flip directions
@@ -915,8 +922,8 @@ float4 SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Target
 		float3 Pos = GetPosition(  texcoords, RayCoords, Normals_Depth.w - ATTF, vsFetch.w + ATTF);
 		float3 normalizedPos = normalize(Pos);
 
-		float  AO  = smoothstep(0,SSDO_AngleThreshold,dot(normalizedPos,Normals_Depth.xyz));
-		//float  AO  = max(0.0,dot(normalizedPos,Normals_Depth.xyz));
+		//float  AO  = smoothstep(0,SSDO_AngleThreshold,dot(normalizedPos,Normals_Depth.xyz));
+		float  AO  = max(0.0,dot(normalizedPos,Normals_Depth.xyz));
 			   AO *= sign( length(Normals_Depth.xyz-vsFetch.xyz) );
 		// Listed as attenuation......
 		float SSDO_RangeCheck = max(0.0,SSDO_Contribution_Range-length(Pos))/SSDO_Contribution_Range;
@@ -1413,7 +1420,6 @@ technique SSDO_Plus
 < ui_label = "GloomAO";
   ui_tooltip = "GloomAO: Screen Space Directional Occlusion"; >
 {
-	#if Force_Texture_Details
 		pass SSDO_Colors
 	{
 		VertexShader = PostProcessVS;
@@ -1427,16 +1433,6 @@ technique SSDO_Plus
 		RenderTarget0 = texNormalsSSDO;
 		RenderTarget1 = texDepthSSDO;
 	}
-	#else
-		pass SSDO_Normals_Depth_Colors
-	{
-		VertexShader = PostProcessVS;
-		PixelShader = NormalsColorsDepth;
-		RenderTarget0 = texNormalsSSDO;
-		RenderTarget1 = texColorsSSDO;
-		RenderTarget2 = texDepthSSDO;
-	}
-	#endif
 		pass SSDO
 	{
 		VertexShader = PostProcessVS;
