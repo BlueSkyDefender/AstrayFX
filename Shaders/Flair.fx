@@ -577,7 +577,7 @@ float3 GlammorB(float2 texcoord )
 #endif
 
 // Spread the blur a bit more.
-void Glammor(float4 position : SV_Position, float2 texcoord : TEXCOORD, out float3 GBloom : SV_Target)
+void Glammor_Out(float4 position : SV_Position, float2 texcoord : TEXCOORD, out float3 GBloom : SV_Target)
 {	GBloom = 0;
 	float GI = Flare_Power, AL = smoothstep(0,1,1. - tex2D(SamplerAvgLumG,0.0).x);
 	if(Auto_Flare_Intensity)
@@ -757,7 +757,7 @@ technique Flair
 		pass Star
 	{
 		VertexShader = PostProcessVS;
-		PixelShader = Glammor;
+		PixelShader = Glammor_Out;
 		RenderTarget = texFlare;
 	}
 			pass Lum

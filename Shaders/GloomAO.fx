@@ -992,7 +992,7 @@ float4 CEAGD_V_SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV
 	return Denoise(SamplerSSDOH, texcoords, EvenSteven[clamp(SamplesXY,0,20)], 1, 2.5 );
 }
 
-float4 TAA_SSDO(float2 texcoords,float Mip)
+float4 TAA_SSDO_Helper(float2 texcoords,float Mip)
 {
 	return tex2Dlod(SamplerSSDOV, float4(texcoords, 0, Mip)).rgba;
 }
@@ -1001,22 +1001,22 @@ float4 TAA_SSDO(float4 vpos : SV_Position, float2 texcoords : TEXCOORD) : SV_Tar
 {
 	float Per = 1-Persistence;
     float4 PastColor = tex2Dlod(SSDOaccuFrames,float4(texcoords,0,0) );//Past Back Buffer
-		   PastColor = (1-Per) * TAA_SSDO(texcoords, 0) + Per * PastColor;
+		   PastColor = (1-Per) * TAA_SSDO_Helper(texcoords, 0) + Per * PastColor;
 
     float3 antialiased = PastColor.xyz;
     float mixRate = min(PastColor.w, 0.5), MB = 0.0;//WIP
 
-    float3 BB = TAA_SSDO(texcoords, 0).rgb;
+    float3 BB = TAA_SSDO_Helper(texcoords, 0).rgb;
 
     antialiased = lerp(antialiased * antialiased, BB * BB, mixRate);
     antialiased = sqrt(antialiased);
 
-	float3 minColor = encodePalYuv( TAA_SSDO(texcoords, 0).rgb ) - MB;
-	float3 maxColor = encodePalYuv( TAA_SSDO(texcoords, 0).rgb ) + MB;
+	float3 minColor = encodePalYuv( TAA_SSDO_Helper(texcoords, 0).rgb ) - MB;
+	float3 maxColor = encodePalYuv( TAA_SSDO_Helper(texcoords, 0).rgb ) + MB;
 	for(int i = 1; i < 8; ++i)
 	{   //DX9 work around.
-		minColor = min(minColor,encodePalYuv( TAA_SSDO( texcoords + XYoffset[i], 0).rgb )) - MB;
-		maxColor = max(maxColor,encodePalYuv( TAA_SSDO( texcoords + XYoffset[i], 0).rgb )) + MB;
+		minColor = min(minColor,encodePalYuv( TAA_SSDO_Helper( texcoords + XYoffset[i], 0).rgb )) - MB;
+		maxColor = max(maxColor,encodePalYuv( TAA_SSDO_Helper( texcoords + XYoffset[i], 0).rgb )) + MB;
 	}
    	antialiased = encodePalYuv(antialiased);
 
