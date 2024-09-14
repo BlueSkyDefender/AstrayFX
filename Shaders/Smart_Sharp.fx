@@ -40,13 +40,10 @@
 // http://reshade.me/forum/shader-presentation/2128-sidebyside-3d-depth-map-based-stereoscopic-shader
 //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#if exists "Overwatch.fxh"                                           //Overwatch Intercepter//
-	#include "Overwatch.fxh"
-#else //DA_W Depth_Linearization | DB_X Depth_Flip
-	static const float DA_W = 0.0, DB_X = 0;
-	#define NC 0
-	#define NP 0
-#endif
+
+static const float DA_W = 0.0, DB_X = 0;
+#define NC 0
+#define NP 0
 
 // This is the practical limit for the algorithm's scaling ability. Example resolutions;
 //  1280x720  -> 1080p = 2.25x area

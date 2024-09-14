@@ -33,13 +33,10 @@
 //
 // https://github.com/BlueSkyDefender/Depth3D
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#if exists "Overwatch.fxh"                                           //Overwatch Intercepter//
-	#include "Overwatch.fxh"
-#else //DA_W Depth_Linearization | DB_X Depth_Flip
-	static const float DA_W = 0.0, DB_X = 0;
-	#define NC 0
-	#define NP 0
-#endif
+//DA_W Depth_Linearization | DB_X Depth_Flip
+static const float DA_W = 0.0, DB_X = 0;
+#define NC 0
+#define NP 0
 
 //Automatic Blur Adjustment based on Resolutionsup to 8k considered.
 #if (BUFFER_HEIGHT <= 720)

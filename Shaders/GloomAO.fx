@@ -87,20 +87,17 @@
 //
 // GloomAO Update Notes are at the bottom
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#if exists "Overwatch.fxh"                                           //Overwatch Interceptor//
-	#include "Overwatch.fxh"
-	#define OS 0
-#else// DA_Y = [Depth Adjust] DA_Z = [Offset] DA_W = [Depth Linearization] DB_X = [Depth Flip]
-	static const float DA_Y = 7.5, DA_Z = 0.0, DA_W = 0.0, DB_X = 0;
-	// DC_X = [Barrel Distortion K1] DC_Y = [Barrel Distortion K2] DC_Z = [Barrel Distortion K3] DC_W = [Barrel Distortion Zoom]
-	static const float DC_X = 0, DC_Y = 0, DC_Z = 0, DC_W = 0;
-	// DD_X = [Horizontal Size] DD_Y = [Vertical Size] DD_Z = [Horizontal Position] DD_W = [Vertical Position]
-	static const float DD_X = 1, DD_Y = 1, DD_Z = 0.0, DD_W = 0.0;
-	//Triggers
-	static const int RE = 0, NC = 0, RH = 0, NP = 0, ID = 0, SP = 0, DC = 0, HM = 0, DF = 0, NF = 0, DS = 0, LBC = 0, LBM = 0, DA = 0, NW = 0, PE = 0, FV = 0, ED = 0;
-	//Overwatch.fxh State
-	#define OS 1
-#endif
+
+// DA_Y = [Depth Adjust] DA_Z = [Offset] DA_W = [Depth Linearization] DB_X = [Depth Flip]
+static const float DA_Y = 7.5, DA_Z = 0.0, DA_W = 0.0, DB_X = 0;
+// DC_X = [Barrel Distortion K1] DC_Y = [Barrel Distortion K2] DC_Z = [Barrel Distortion K3] DC_W = [Barrel Distortion Zoom]
+static const float DC_X = 0, DC_Y = 0, DC_Z = 0, DC_W = 0;
+// DD_X = [Horizontal Size] DD_Y = [Vertical Size] DD_Z = [Horizontal Position] DD_W = [Vertical Position]
+static const float DD_X = 1, DD_Y = 1, DD_Z = 0.0, DD_W = 0.0;
+//Triggers
+static const int RE = 0, NC = 0, RH = 0, NP = 0, ID = 0, SP = 0, DC = 0, HM = 0, DF = 0, NF = 0, DS = 0, LBC = 0, LBM = 0, DA = 0, NW = 0, PE = 0, FV = 0, ED = 0;
+//Overwatch.fxh State
+#define OS 1
 
 //Depth Buffer Adjustments
 #define DB_Size_Position 1    //[Off | On]         This is used to reposition and adjust the size of the depth buffer.
