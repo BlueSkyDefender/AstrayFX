@@ -1757,32 +1757,18 @@ float4 MixOut(float2 texcoords)
 
 	return Done;
 }
-////////////////////////////////////////////////////////////////Overwatch////////////////////////////////////////////////////////////////////////////
-float Text_Switch() { return RH || NC || NP || NF || PE || DS || OS || DA || NW || FV ? 0 : 1; }
-static const float  CH_A    = float(0x69f99), CH_B    = float(0x79797), CH_C    = float(0xe111e),
-					CH_D    = float(0x79997), CH_E    = float(0xf171f), CH_F    = float(0xf1711),
-					CH_G    = float(0xe1d96), CH_H    = float(0x99f99), CH_I    = float(0xf444f),
-					CH_J    = float(0x88996), CH_K    = float(0x95159), CH_L    = float(0x1111f),
-					CH_M    = float(0x9fd99), CH_N    = float(0x9bd99), CH_O    = float(0x69996),
-					CH_P    = float(0x79971), CH_Q    = float(0x69b5a), CH_R    = float(0x79759),
-					CH_S    = float(0xe1687), CH_T    = float(0xf4444), CH_U    = float(0x99996),
-					CH_V    = float(0x999a4), CH_W    = float(0x999f9), CH_X    = float(0x99699),
-					CH_Y    = float(0x99e8e), CH_Z    = float(0xf843f), CH_0    = float(0x6bd96),
-					CH_1    = float(0x46444), CH_2    = float(0x6942f), CH_3    = float(0x69496),
-					CH_4    = float(0x99f88), CH_5    = float(0xf1687), CH_6    = float(0x61796),
-					CH_7    = float(0xf8421), CH_8    = float(0x69696), CH_9    = float(0x69e84),
-					CH_APST = float(0x66400), CH_PI   = float(0x0faa9), CH_UNDS = float(0x0000f),
-					CH_HYPH = float(0x00600), CH_TILD = float(0x0a500), CH_PLUS = float(0x02720),
-					CH_EQUL = float(0x0f0f0), CH_SLSH = float(0x08421), CH_EXCL = float(0x33303),
-					CH_QUES = float(0x69404), CH_COMM = float(0x00032), CH_FSTP = float(0x00002),
-					CH_QUOT = float(0x55000), CH_BLNK = float(0x00000), CH_COLN = float(0x00202),
-					CH_LPAR = float(0x42224), CH_RPAR = float(0x24442);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+static const float  CH_D    = float(0x79997), CH_E    = float(0xf171f), CH_F    = float(0xf1711),
+					CH_H    = float(0x99f99), CH_I    = float(0xf444f), CH_N    = float(0x9bd99), 
+					CH_O    = float(0x69996), CH_P    = float(0x79971), CH_T    = float(0xf4444), 
+					CH_3    = float(0x69496), CH_FSTP = float(0x00002);
+					
 #define MAP_SIZE float2(4,5)
 //returns the status of a bit in a bitmap. This is done value-wise, so the exact representation of the float doesn't really matter.
 float getBit( float map, float index )
 {   // Ooh -index takes out that divide :)
     return fmod( floor( map * exp2(-index) ), 2.0 );
-}   float DT_Information(){ float DT_Text = Text_Switch() ? T_02() : T_01(); return clock <= DT_Text; }
+}   float DT_Information(){ float DT_Text = T_01(); return clock <= DT_Text; }
 
 float drawChar( float Char, float2 pos, float2 size, float2 TC )
 {   // Subtract our position from the current TC so that we can know if we're inside the bounding box or not.
@@ -1801,217 +1787,15 @@ float drawChar( float Char, float2 pos, float2 size, float2 TC )
 float4 Out(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
 {
 	float2 TC = float2(texcoord.x,1-texcoord.y);
-	float Gradient = (1-texcoord.y*50.0+48.85)*texcoord.y-0.500, BT = smoothstep(0,1,sin(clock*(3.75/1000))), Size = 1.1, Depth3D, Read_Help, Supported, SetFoV, FoV, Post, Effect, NoPro, NotCom, Mod, Needs, Net, Over, Set, AA, Emu, Not, No, Help, Fix, Need, State, SetAA, SetWP, Work;
+	float Gradient = (1-texcoord.y*50.0+48.85)*texcoord.y-0.500, BT = smoothstep(0,1,sin(clock*(3.75/1000))), Size = 1.1, Depth3D;
 	float4 Color = MixOut(texcoord);
 
-	[branch] if(DT_Information() || Text_Info_Plus())
+	[branch] if(Text_Info_Plus())
 	{ // Set a general character size...
 		float2 charSize = float2(.00875, .0125) * Size;
 		// Starting position.
 		float2 charPos = float2( 0.009, 0.9725);
-		//Needs Copy Depth and/or Depth Selection
-		Needs += drawChar( CH_N, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_D, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_S, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_C, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_O, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_P, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_Y, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_D, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_P, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_T, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_H, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_A, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_N, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_D, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_SLSH, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_O, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_R, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_D, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_P, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_T, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_H, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_S, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_L, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_C, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_T, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_I, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_O, charPos, charSize, TC); charPos.x += .01 * Size;
-		Needs += drawChar( CH_N, charPos, charSize, TC);
-		//Network Play May Need Modded DLL
-		charPos = float2( 0.009, 0.955);
-		Work += drawChar( CH_N, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_T, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_W, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_O, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_R, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_K, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_P, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_L, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_A, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_Y, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_M, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_A, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_Y, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_N, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_D, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_M, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_O, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_D, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_D, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_D, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_D, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_L, charPos, charSize, TC); charPos.x += .01 * Size;
-		Work += drawChar( CH_L, charPos, charSize, TC);
-		//Disable CA/MB/Dof/Grain
-		charPos = float2( 0.009, 0.9375);
-		Effect += drawChar( CH_D, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_I, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_S, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_A, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_B, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_L, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_C, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_A, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_SLSH, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_M, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_B, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_SLSH, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_D, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_O, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_F, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_SLSH, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_G, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_R, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_A, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_I, charPos, charSize, TC); charPos.x += .01 * Size;
-		Effect += drawChar( CH_N, charPos, charSize, TC);
-		//Disable TAA/MSAA/AA
-		charPos = float2( 0.009, 0.920);
-		SetAA += drawChar( CH_D, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_I, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_S, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_A, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_B, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_L, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_T, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_A, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_A, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_SLSH, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_M, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_S, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_A, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_A, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_SLSH, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_A, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetAA += drawChar( CH_A, charPos, charSize, TC);
-		//Set FoV
-		charPos = float2( 0.009, 0.9025);
-		SetFoV += drawChar( CH_S, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetFoV += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetFoV += drawChar( CH_T, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetFoV += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetFoV += drawChar( CH_F, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetFoV += drawChar( CH_O, charPos, charSize, TC); charPos.x += .01 * Size;
-		SetFoV += drawChar( CH_V, charPos, charSize, TC);
-		//Read Help
-		charPos = float2( 0.894, 0.9725);
-		Read_Help += drawChar( CH_R, charPos, charSize, TC); charPos.x += .01 * Size;
-		Read_Help += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		Read_Help += drawChar( CH_A, charPos, charSize, TC); charPos.x += .01 * Size;
-		Read_Help += drawChar( CH_D, charPos, charSize, TC); charPos.x += .01 * Size;
-		Read_Help += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		Read_Help += drawChar( CH_H, charPos, charSize, TC); charPos.x += .01 * Size;
-		Read_Help += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		Read_Help += drawChar( CH_L, charPos, charSize, TC); charPos.x += .01 * Size;
-		Read_Help += drawChar( CH_P, charPos, charSize, TC);
-		//New Start
-		charPos = float2( 0.009, 0.018);
-		// No Profile
-		NoPro += drawChar( CH_N, charPos, charSize, TC); charPos.x += .01 * Size;
-		NoPro += drawChar( CH_O, charPos, charSize, TC); charPos.x += .01 * Size;
-		NoPro += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		NoPro += drawChar( CH_P, charPos, charSize, TC); charPos.x += .01 * Size;
-		NoPro += drawChar( CH_R, charPos, charSize, TC); charPos.x += .01 * Size;
-		NoPro += drawChar( CH_O, charPos, charSize, TC); charPos.x += .01 * Size;
-		NoPro += drawChar( CH_F, charPos, charSize, TC); charPos.x += .01 * Size;
-		NoPro += drawChar( CH_I, charPos, charSize, TC); charPos.x += .01 * Size;
-		NoPro += drawChar( CH_L, charPos, charSize, TC); charPos.x += .01 * Size;
-		NoPro += drawChar( CH_E, charPos, charSize, TC); charPos.x = 0.009;
-		//Not Compatible
-		NotCom += drawChar( CH_N, charPos, charSize, TC); charPos.x += .01 * Size;
-		NotCom += drawChar( CH_O, charPos, charSize, TC); charPos.x += .01 * Size;
-		NotCom += drawChar( CH_T, charPos, charSize, TC); charPos.x += .01 * Size;
-		NotCom += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		NotCom += drawChar( CH_C, charPos, charSize, TC); charPos.x += .01 * Size;
-		NotCom += drawChar( CH_O, charPos, charSize, TC); charPos.x += .01 * Size;
-		NotCom += drawChar( CH_P, charPos, charSize, TC); charPos.x += .01 * Size;
-		NotCom += drawChar( CH_A, charPos, charSize, TC); charPos.x += .01 * Size;
-		NotCom += drawChar( CH_T, charPos, charSize, TC); charPos.x += .01 * Size;
-		NotCom += drawChar( CH_I, charPos, charSize, TC); charPos.x += .01 * Size;
-		NotCom += drawChar( CH_B, charPos, charSize, TC); charPos.x += .01 * Size;
-		NotCom += drawChar( CH_L, charPos, charSize, TC); charPos.x += .01 * Size;
-		NotCom += drawChar( CH_E, charPos, charSize, TC); charPos.x = 0.009;
-		//Needs Fix/Mod
-		Mod += drawChar( CH_N, charPos, charSize, TC); charPos.x += .01 * Size;
-		Mod += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		Mod += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		Mod += drawChar( CH_D, charPos, charSize, TC); charPos.x += .01 * Size;
-		Mod += drawChar( CH_S, charPos, charSize, TC); charPos.x += .01 * Size;
-		Mod += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		Mod += drawChar( CH_F, charPos, charSize, TC); charPos.x += .01 * Size;
-		Mod += drawChar( CH_I, charPos, charSize, TC); charPos.x += .01 * Size;
-		Mod += drawChar( CH_X, charPos, charSize, TC); charPos.x += .01 * Size;
-		Mod += drawChar( CH_SLSH, charPos, charSize, TC); charPos.x += .01 * Size;
-		Mod += drawChar( CH_M, charPos, charSize, TC); charPos.x += .01 * Size;
-		Mod += drawChar( CH_O, charPos, charSize, TC); charPos.x += .01 * Size;
-		Mod += drawChar( CH_D, charPos, charSize, TC); charPos.x = 0.009;
-		//Overwatch.fxh Missing
-		State += drawChar( CH_O, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_V, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_E, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_R, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_W, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_A, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_T, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_C, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_H, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_FSTP, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_F, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_X, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_H, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_BLNK, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_M, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_I, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_S, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_S, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_I, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_N, charPos, charSize, TC); charPos.x += .01 * Size;
-		State += drawChar( CH_G, charPos, charSize, TC);
+
 		//New Size
 		float D3D_Size_A = 1.375,D3D_Size_B = 0.75;
 		float2 charSize_A = float2(.00875, .0125) * D3D_Size_A, charSize_B = float2(.00875, .0125) * D3D_Size_B;
@@ -2031,30 +1815,9 @@ float4 Out(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Targe
 		Depth3D += drawChar( CH_N, charPos, charSize_B, TC); charPos.x += .01 * D3D_Size_B;
 		Depth3D += drawChar( CH_F, charPos, charSize_B, TC); charPos.x += .01 * D3D_Size_B;
 		Depth3D += drawChar( CH_O, charPos, charSize_B, TC);
-		//Text Information
-		if(DS)
-			Need = Needs;
-		if(RH)
-			Help = Read_Help;
-		if(NW)
-			Net = Work;
-		if(PE)
-			Post = Effect;
-		if(DA)
-			AA = SetAA;
-		if(FV)
-			FoV = SetFoV;
-		//Blinking Text Warnings
-		if(NP)
-			No = NoPro * BT;
-		if(NC)
-			Not = NotCom * BT;
-		if(NF)
-			Fix = Mod * BT;
-		if(OS)
-			Over = State * BT;
+
 		//Website
-		return Depth3D+(Disable_Debug_Info ? 0 : Help+Post+No+Not+Net+Fix+Need+Over+AA+Set+FoV+Emu) ? Minimize_Web_Info ? lerp(Gradient + Depth3D,Color,saturate(Depth3D*0.98)) : Gradient : Color;
+		return Depth3D ? Minimize_Web_Info ? lerp(Gradient + Depth3D,Color,saturate(Depth3D*0.98)) : Gradient : Color;
 	}
 	else
 		return Helper() ? 0 : Color;
