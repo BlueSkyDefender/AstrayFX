@@ -48,7 +48,7 @@ static const float DA_W = 0.0, DB_X = 0;
 #elif (BUFFER_HEIGHT <= 2160)
 	#define Multi 2
 #else
-	#define Quality 2.5
+	#define Multi 2.5
 #endif
 
 // It is best to run Smart Sharp after tonemapping.
