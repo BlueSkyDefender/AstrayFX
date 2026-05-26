@@ -1,6 +1,6 @@
- ////---------------//
- ///**Depth Cues**///
- //---------------////
+////---------------//
+///**Depth Cues**///
+//---------------////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Depth Based Unsharp Mask haloing
@@ -10,23 +10,34 @@
 //                                Extra Information for where I got the Idea for Depth Cues.
 //                             https://www.uni-konstanz.de/mmsp/pubsys/publishedFiles/LuCoDe06.pdf
 //
-// LICENSE
+// COPYRIGHT
 // ============
-// Overwatch & Depth Cues is licenses under: Attribution-NoDerivatives 4.0 International
+// Copyright (c) 2026 Jose Negrete / BlueSkyDefender.
+// All rights reserved.
 //
-// You are free to:
-// Share - copy and redistribute the material in any medium or format
-// for any purpose, even commercially.
-// The licensor cannot revoke these freedoms as long as you follow the license terms.
-// Under the following terms:
-// Attribution - You must give appropriate credit, provide a link to the license, and indicate if changes were made.
-// You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.
+// PERMISSION
+// ============
+// Permission is granted to use and share unmodified copies of this shader
+// with proper credit to Jose Negrete / BlueSkyDefender.
 //
-// NoDerivatives - If you remix, transform, or build upon the material, you may not distribute the modified material.
+// Modified versions, derivatives, ports, or redistributed modified copies
+// are not permitted without separate written permission from
+// Jose Negrete / BlueSkyDefender.
 //
-// No additional restrictions - You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.
+// Separate written permission may be granted for specific people, projects,
+// versions, or use cases. Any such permission applies only to the terms
+// stated in that written permission.
 //
-// https://creativecommons.org/licenses/by-nd/4.0/
+// This version is no longer distributed under
+// Creative Commons Attribution-NoDerivatives 4.0 International.
+//
+// Older copies released before May 26, 2026 may have been distributed
+// under Creative Commons Attribution-NoDerivatives 4.0 International.
+// That older license remains valid for those older copies.
+//
+// Historical versions may be visible in the GitHub commit history,
+// forks, archives, or previous releases, but the current version is
+// covered by this notice.
 //
 // Have fun,
 // Jose Negrete AKA BlueSkyDefender
@@ -283,110 +294,9 @@ float3 ShaderOut_DC(float2 texcoord : TEXCOORD0)
 }
 ////////////////////////////////////////////////////////Logo/////////////////////////////////////////////////////////////////////////
 float3 Out_DC(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
-{   //Overwatch integration
-	float PosX = 0.9525f*BUFFER_WIDTH*pix.x,PosY = 0.975f*BUFFER_HEIGHT*pix.y, Text_Timer = 12500, BT = smoothstep(0,1,sin(timer*(3.75/1000)));
-	float D,E,P,T,H,Three,DD,Dot,I,N,F,O,R,EE,A,DDD,HH,EEE,L,PP,NN,PPP,C,Not,No;
+{ 
 	float3 Color = ShaderOut_DC(texcoord).rgb;
-
-	if(NC || NP)
-		Text_Timer = 18750;
-
-	[branch] if(timer <= Text_Timer)
-	{
-		//DEPTH
-		//D
-		float PosXD = -0.035+PosX, offsetD = 0.001;
-		float OneD = all( abs(float2( texcoord.x -PosXD, texcoord.y-PosY)) < float2(0.0025,0.009));
-		float TwoD = all( abs(float2( texcoord.x -PosXD-offsetD, texcoord.y-PosY)) < float2(0.0025,0.007));
-		D = OneD-TwoD;
-		//E
-		float PosXE = -0.028+PosX, offsetE = 0.0005;
-		float OneE = all( abs(float2( texcoord.x -PosXE, texcoord.y-PosY)) < float2(0.003,0.009));
-		float TwoE = all( abs(float2( texcoord.x -PosXE-offsetE, texcoord.y-PosY)) < float2(0.0025,0.007));
-		float ThreeE = all( abs(float2( texcoord.x -PosXE, texcoord.y-PosY)) < float2(0.003,0.001));
-		E = (OneE-TwoE)+ThreeE;
-		//P
-		float PosXP = -0.0215+PosX, PosYP = -0.0025+PosY, offsetP = 0.001, offsetP1 = 0.002;
-		float OneP = all( abs(float2( texcoord.x -PosXP, texcoord.y-PosYP)) < float2(0.0025,0.009*0.775));
-		float TwoP = all( abs(float2( texcoord.x -PosXP-offsetP, texcoord.y-PosYP)) < float2(0.0025,0.007*0.680));
-		float ThreeP = all( abs(float2( texcoord.x -PosXP+offsetP1, texcoord.y-PosY)) < float2(0.0005,0.009));
-		P = (OneP-TwoP) + ThreeP;
-		//T
-		float PosXT = -0.014+PosX, PosYT = -0.008+PosY;
-		float OneT = all( abs(float2( texcoord.x -PosXT, texcoord.y-PosYT)) < float2(0.003,0.001));
-		float TwoT = all( abs(float2( texcoord.x -PosXT, texcoord.y-PosY)) < float2(0.000625,0.009));
-		T = OneT+TwoT;
-		//H
-		float PosXH = -0.0072+PosX;
-		float OneH = all( abs(float2( texcoord.x -PosXH, texcoord.y-PosY)) < float2(0.002,0.001));
-		float TwoH = all( abs(float2( texcoord.x -PosXH, texcoord.y-PosY)) < float2(0.002,0.009));
-		float ThreeH = all( abs(float2( texcoord.x -PosXH, texcoord.y-PosY)) < float2(0.00325,0.009));
-		H = (OneH-TwoH)+ThreeH;
-		//Three
-		float offsetFive = 0.001, PosX3 = -0.001+PosX;
-		float OneThree = all( abs(float2( texcoord.x -PosX3, texcoord.y-PosY)) < float2(0.002,0.009));
-		float TwoThree = all( abs(float2( texcoord.x -PosX3 - offsetFive, texcoord.y-PosY)) < float2(0.003,0.007));
-		float ThreeThree = all( abs(float2( texcoord.x -PosX3, texcoord.y-PosY)) < float2(0.002,0.001));
-		Three = (OneThree-TwoThree)+ThreeThree;
-		//DD
-		float PosXDD = 0.006+PosX, offsetDD = 0.001;
-		float OneDD = all( abs(float2( texcoord.x -PosXDD, texcoord.y-PosY)) < float2(0.0025,0.009));
-		float TwoDD = all( abs(float2( texcoord.x -PosXDD-offsetDD, texcoord.y-PosY)) < float2(0.0025,0.007));
-		DD = OneDD-TwoDD;
-		//Dot
-		float PosXDot = 0.011+PosX, PosYDot = 0.008+PosY;
-		float OneDot = all( abs(float2( texcoord.x -PosXDot, texcoord.y-PosYDot)) < float2(0.00075,0.0015));
-		Dot = OneDot;
-		//INFO
-		//I
-		float PosXI = 0.0155+PosX, PosYI = 0.004+PosY, PosYII = 0.008+PosY;
-		float OneI = all( abs(float2( texcoord.x - PosXI, texcoord.y - PosY)) < float2(0.003,0.001));
-		float TwoI = all( abs(float2( texcoord.x - PosXI, texcoord.y - PosYI)) < float2(0.000625,0.005));
-		float ThreeI = all( abs(float2( texcoord.x - PosXI, texcoord.y - PosYII)) < float2(0.003,0.001));
-		I = OneI+TwoI+ThreeI;
-		//N
-		float PosXN = 0.0225+PosX, PosYN = 0.005+PosY,offsetN = -0.001;
-		float OneN = all( abs(float2( texcoord.x - PosXN, texcoord.y - PosYN)) < float2(0.002,0.004));
-		float TwoN = all( abs(float2( texcoord.x - PosXN, texcoord.y - PosYN - offsetN)) < float2(0.003,0.005));
-		N = OneN-TwoN;
-		//F
-		float PosXF = 0.029+PosX, PosYF = 0.004+PosY, offsetF = 0.0005, offsetF1 = 0.001;
-		float OneF = all( abs(float2( texcoord.x -PosXF-offsetF, texcoord.y-PosYF-offsetF1)) < float2(0.002,0.004));
-		float TwoF = all( abs(float2( texcoord.x -PosXF, texcoord.y-PosYF)) < float2(0.0025,0.005));
-		float ThreeF = all( abs(float2( texcoord.x -PosXF, texcoord.y-PosYF)) < float2(0.0015,0.00075));
-		F = (OneF-TwoF)+ThreeF;
-		//O
-		float PosXO = 0.035+PosX, PosYO = 0.004+PosY;
-		float OneO = all( abs(float2( texcoord.x -PosXO, texcoord.y-PosYO)) < float2(0.003,0.005));
-		float TwoO = all( abs(float2( texcoord.x -PosXO, texcoord.y-PosYO)) < float2(0.002,0.003));
-		O = OneO-TwoO;
-		//Text Warnings: No Profile / Not Compatible
-		//PosY += 0.953;
-		PosX -= 0.483;
-		float PosXNN = -0.458+PosX, offsetNN = 0.0015;
-		float OneNN = all( abs(float2( texcoord.x -PosXNN, texcoord.y-PosY)) < float2(0.00325,0.009));
-		float TwoNN = all( abs(float2( texcoord.x -PosXNN, texcoord.y-PosY-offsetNN)) < float2(0.002,0.008));
-		NN = OneNN-TwoNN;
-		//PPP
-		float PosXPPP = -0.451+PosX, PosYPPP = -0.0025+PosY, offsetPPP = 0.001, offsetPPP1 = 0.002;
-		float OnePPP = all( abs(float2( texcoord.x -PosXPPP, texcoord.y-PosYPPP)) < float2(0.0025,0.009*0.775));
-		float TwoPPP = all( abs(float2( texcoord.x -PosXPPP-offsetPPP, texcoord.y-PosYPPP)) < float2(0.0025,0.007*0.680));
-		float ThreePPP = all( abs(float2( texcoord.x -PosXPPP+offsetPPP1, texcoord.y-PosY)) < float2(0.0005,0.009));
-		PPP = (OnePPP-TwoPPP) + ThreePPP;
-		//C
-		float PosXC = -0.450+PosX, offsetC = 0.001;
-		float OneC = all( abs(float2( texcoord.x -PosXC, texcoord.y-PosY)) < float2(0.0035,0.009));
-		float TwoC = all( abs(float2( texcoord.x -PosXC-offsetC, texcoord.y-PosY)) < float2(0.0025,0.007));
-		C = OneC-TwoC;
-		if(NP)
-			No = (NN + PPP) * BT; //Blinking Text
-		if(NC)
-			Not = (NN + C) * BT; //Blinking Text
-		//Website
-		return D+E+P+T+H+Three+DD+Dot+I+N+F+O+No+Not ? (1-texcoord.y*50.0+48.85)*texcoord.y-0.500: Color;
-	}
-	else
-		return Color;
+	return Color;
 }
 ///////////////////////////////////////////////////////////ReShade.fxh/////////////////////////////////////////////////////////////
 
